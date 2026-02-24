@@ -1,3 +1,55 @@
+export interface Message {
+  id: number;
+  from: string;
+  to: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface CreateMessageParams {
+  from: string;
+  to: string;
+  text: string;
+}
+
+export interface ListMessagesFilter {
+  from?: string;
+  to?: string;
+}
+
+export class MessageService {
+  private messages: Message[] = [];
+
+  private nextId = 1;
+
+  createMessage({ from, to, text }: CreateMessageParams): Message {
+    const message: Message = {
+      id: this.nextId++,
+      from,
+      to,
+      text,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.messages.push(message);
+    return message;
+  }
+
+  listMessages({ from, to }: ListMessagesFilter = {}): Message[] {
+    if (!from && !to) {
+      return this.messages;
+    }
+
+    return this.messages.filter((msg) => {
+      if (from && msg.from !== from) return false;
+      if (to && msg.to !== to) return false;
+      return true;
+    });
+  }
+}
+
+export const messageService = new MessageService();
+
 import type {
   IConversationRepository,
   IMessageRepository,

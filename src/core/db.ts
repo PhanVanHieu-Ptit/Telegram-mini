@@ -1,5 +1,5 @@
-const { MongoClient } = require("mongodb");
-const { Pool } = require("pg");
+import { MongoClient, type Db } from "mongodb";
+import { Pool } from "pg";
 
 const {
   MONGO_URI,
@@ -11,23 +11,26 @@ const {
   PG_PASSWORD,
 } = process.env;
 
-let mongoClient;
+let mongoClient: MongoClient | null = null;
 
-async function connectMongo() {
+export async function connectMongo(): Promise<Db> {
   if (!MONGO_URI || !MONGO_DB_NAME) {
     // eslint-disable-next-line no-console
-    console.error("MongoDB environment variables MONGO_URI or MONGO_DB_NAME are not set");
+    console.error(
+      "MongoDB environment variables MONGO_URI or MONGO_DB_NAME are not set",
+    );
     throw new Error("MongoDB configuration error");
   }
 
-  if (!mongoClient || (mongoClient.topology && mongoClient.topology.isDestroyed())) {
+  if (!mongoClient || mongoClient.topology?.isDestroyed()) {
     mongoClient = new MongoClient(MONGO_URI);
   }
 
   try {
     await mongoClient.connect();
-    await mongoClient.db(MONGO_DB_NAME).command({ ping: 1 });
-    return mongoClient.db(MONGO_DB_NAME);
+    const db = mongoClient.db(MONGO_DB_NAME);
+    await db.command({ ping: 1 });
+    return db;
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("Failed to connect to MongoDB", err);
@@ -35,7 +38,7 @@ async function connectMongo() {
   }
 }
 
-const pgPool = new Pool({
+export const pgPool = new Pool({
   host: PG_HOST,
   port: PG_PORT ? Number(PG_PORT) : undefined,
   database: PG_DATABASE,
@@ -43,13 +46,8 @@ const pgPool = new Pool({
   password: PG_PASSWORD,
 });
 
-pgPool.on("error", (err) => {
+pgPool.on("error", (err: Error) => {
   // eslint-disable-next-line no-console
   console.error("Unexpected error on idle PostgreSQL client", err);
 });
-
-module.exports = {
-  connectMongo,
-  pgPool,
-};
 
