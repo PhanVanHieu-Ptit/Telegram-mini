@@ -31,16 +31,10 @@ export async function buildServer(
 async function start(): Promise<void> {
   const app = await buildServer();
 
-  const server = http.createServer(app);
-
-  setupSocketIOServer(server, app);
-
   const port = Number(process.env.PORT) || 3000;
   const host = process.env.HOST ?? "0.0.0.0";
-
-  server.listen(port, host, () => {
-    app.log.info(`Server listening on http://${host}:${port}`);
-  });
+  await app.listen({ port, host });
+  app.log.info(`Server listening on http://${host}:${port}`);
 }
 
 if (require.main === module) {
