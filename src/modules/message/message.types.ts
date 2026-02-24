@@ -24,3 +24,9 @@ export interface MessageDTO {
   updatedAt?: string;
 }
 
+export interface ConversationDTO {
+  id: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+

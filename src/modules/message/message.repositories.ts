@@ -1,4 +1,8 @@
-import type { MessageDTO, MessageEntity } from "./message.types";
+import type {
+  ConversationDTO,
+  MessageDTO,
+  MessageEntity,
+} from "./message.types";
 
 export interface IMessageRepository {
   create(
@@ -16,5 +20,14 @@ export interface IConversationRepository {
   isMember(conversationId: string, userId: string): Promise<boolean>;
 
   updateUpdatedAt(conversationId: string): Promise<void>;
+
+  createConversation(userIds: string[]): Promise<ConversationDTO>;
+
+  getUserConversations(userId: string): Promise<ConversationDTO[]>;
+
+  joinConversation(
+    conversationId: string,
+    userId: string,
+  ): Promise<void>;
 }
 
