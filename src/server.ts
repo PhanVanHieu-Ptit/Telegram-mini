@@ -1,10 +1,14 @@
-const path = require("node:path");
-const http = require("node:http");
+import path from "node:path";
+import http from "node:http";
 
-const fastify = require("fastify");
-const autoLoad = require("fastify-autoload");
+import fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
+import autoLoad from "fastify-autoload";
 
-async function buildServer(options = {}) {
+import setupSocketIOServer from "./socket";
+
+export async function buildServer(
+  options: FastifyServerOptions = {},
+): Promise<FastifyInstance> {
   const app = fastify({
     logger: true,
     ...options,
@@ -24,15 +28,15 @@ async function buildServer(options = {}) {
   return app;
 }
 
-async function start() {
+async function start(): Promise<void> {
   const app = await buildServer();
 
   const server = http.createServer(app);
 
-  require("./socket")(server, app);
+  setupSocketIOServer(server, app);
 
-  const port = process.env.PORT || 3000;
-  const host = process.env.HOST || "0.0.0.0";
+  const port = Number(process.env.PORT) || 3000;
+  const host = process.env.HOST ?? "0.0.0.0";
 
   server.listen(port, host, () => {
     app.log.info(`Server listening on http://${host}:${port}`);
@@ -40,6 +44,7 @@ async function start() {
 }
 
 if (require.main === module) {
+  // eslint-disable-next-line n/no-process-exit, unicorn/no-process-exit
   start().catch((err) => {
     // eslint-disable-next-line no-console
     console.error(err);
@@ -47,4 +52,3 @@ if (require.main === module) {
   });
 }
 
-module.exports = { buildServer };

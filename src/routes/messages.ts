@@ -1,6 +1,8 @@
-const { messageController } = require("../modules/message/message.controller");
+import type { FastifyPluginAsync } from "fastify";
 
-async function routes(fastify, opts) {
+import { messageController } from "../modules/message/message.controller";
+
+const routes: FastifyPluginAsync = async (fastify) => {
   fastify.post("/messages", (request, reply) =>
     messageController.createMessage(request, reply),
   );
@@ -8,7 +10,7 @@ async function routes(fastify, opts) {
   fastify.get("/messages", (request, reply) =>
     messageController.listMessages(request, reply),
   );
-}
+};
 
-module.exports = routes;
+export default routes;
 
