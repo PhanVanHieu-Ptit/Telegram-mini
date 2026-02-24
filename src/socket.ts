@@ -81,6 +81,20 @@ export function setupSocketIOServer(
   io.on("connection", (socket) => {
     fastifyInstance.log.info({ socketId: socket.id }, "Socket connected");
 
+    socket.on("conversation:join", (conversationId: string) => {
+      const userId = socket.data?.userId as string | undefined;
+
+      if (!userId || !conversationId) {
+        socket.emit("error", {
+          message: "userId and conversationId are required",
+        });
+        return;
+      }
+
+      socket.join(`conversation:${conversationId}`);
+      socket.emit("conversation:joined", { conversationId });
+    });
+
     socket.on(
       "message:send",
       async (payload: Pick<SendMessageInput, "conversationId" | "content">) => {
@@ -110,6 +124,51 @@ export function setupSocketIOServer(
         }
       },
     );
+
+    socket.on("typing:start", (conversationId: string) => {
+      const userId = socket.data?.userId as string | undefined;
+
+      if (!userId || !conversationId) {
+        return;
+      }
+
+      const room = `conversation:${conversationId}`;
+      socket.to(room).emit("typing:start", { userId, conversationId });
+    });
+
+    socket.on("typing:stop", (conversationId: string) => {
+      const userId = socket.data?.userId as string | undefined;
+
+      if (!userId || !conversationId) {
+        return;
+      }
+
+      const room = `conversation:${conversationId}`;
+      socket.to(room).emit("typing:stop", { userId, conversationId });
+    });
+
+    socket.on("message:seen", async (payload: { conversationId: string; messageId: string }) => {
+      const userId = socket.data?.userId as string | undefined;
+      const { conversationId, messageId } = payload ?? {};
+
+      if (!userId || !conversationId || !messageId) {
+        socket.emit("message:error", {
+          message: "userId, conversationId and messageId are required",
+        });
+        return;
+      }
+
+      try {
+        await conversationRepository.updateLastReadMessage(conversationId, userId, messageId);
+
+        const room = `conversation:${conversationId}`;
+        io.to(room).emit("message:seen_update", { userId, conversationId, messageId });
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : "Failed to update read status";
+        socket.emit("message:error", { message });
+      }
+    });
 
     socket.on("disconnect", (reason: string) => {
       fastifyInstance.log.info(
