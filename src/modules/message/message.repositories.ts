@@ -1,14 +1,20 @@
-import type { MessageDTO } from "./message.types";
+import type { MessageDTO, MessageEntity } from "./message.types";
+
+export interface IMessageRepository {
+  create(
+    data: Pick<MessageEntity, "conversationId" | "senderId" | "content">,
+  ): Promise<MessageDTO>;
+
+  findById(id: string): Promise<MessageDTO | null>;
+
+  findByConversationId(conversationId: string): Promise<MessageDTO[]>;
+
+  deleteById(id: string): Promise<void>;
+}
 
 export interface IConversationRepository {
   isMember(conversationId: string, userId: string): Promise<boolean>;
+
   updateUpdatedAt(conversationId: string): Promise<void>;
 }
 
-export interface IMessageRepository {
-  create(params: {
-    conversationId: string;
-    senderId: string;
-    content: string;
-  }): Promise<MessageDTO>;
-}

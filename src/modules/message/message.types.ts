@@ -1,7 +1,18 @@
-export interface CreateMessageInput {
+export interface SendMessageInput {
   conversationId: string;
   senderId: string;
   content: string;
+}
+
+export type CreateMessageInput = SendMessageInput;
+
+export interface MessageEntity {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  content: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface MessageDTO {
@@ -9,5 +20,7 @@ export interface MessageDTO {
   conversationId: string;
   senderId: string;
   content: string;
-  createdAt: Date;
+  createdAt: string;
+  updatedAt?: string;
 }
+
