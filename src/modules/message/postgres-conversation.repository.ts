@@ -10,6 +10,16 @@ interface ConversationRow {
 }
 
 export class PostgresConversationRepository implements IConversationRepository {
+  async updateUpdatedAt(conversationId: string): Promise<void> {
+    await pgPool.query(
+      `
+        UPDATE conversations
+        SET updated_at = NOW()
+        WHERE id = $1
+      `,
+      [conversationId],
+    );
+  }
   async isMember(conversationId: string, userId: string): Promise<boolean> {
     const result = await pgPool.query(
       `
@@ -22,7 +32,7 @@ export class PostgresConversationRepository implements IConversationRepository {
       [conversationId, userId],
     );
 
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   async updateConversationTimestamp(conversationId: string): Promise<void> {
@@ -56,8 +66,22 @@ export class PostgresConversationRepository implements IConversationRepository {
     return result.rows[0];
   }
 
-  async updateUpdatedAt(conversationId: string): Promise<void> {
-    await this.updateConversationTimestamp(conversationId);
+  async updateLastReadMessage(
+    conversationId: string,
+    userId: string,
+    messageId: string,
+  ): Promise<void> {
+    await pgPool.query(
+      `
+        INSERT INTO conversation_read_status (conversation_id, user_id, last_read_message_id, updated_at)
+        VALUES ($1, $2, $3, NOW())
+        ON CONFLICT (conversation_id, user_id)
+        DO UPDATE SET
+          last_read_message_id = EXCLUDED.last_read_message_id,
+          updated_at = NOW()
+      `,
+      [conversationId, userId, messageId],
+    );
   }
 
   async createConversation(userIds: string[]): Promise<ConversationDTO> {

@@ -21,6 +21,12 @@ export interface IConversationRepository {
 
   updateUpdatedAt(conversationId: string): Promise<void>;
 
+  updateLastReadMessage(
+    conversationId: string,
+    userId: string,
+    messageId: string,
+  ): Promise<void>;
+
   createConversation(userIds: string[]): Promise<ConversationDTO>;
 
   getUserConversations(userId: string): Promise<ConversationDTO[]>;
