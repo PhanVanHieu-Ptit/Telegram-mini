@@ -21,6 +21,7 @@
   "homepage": "https://github.com/PhanVanHieu-Ptit/Telegram-mini#readme",
   "dependencies": {
     "@fastify/cors": "^11.2.0",
+    "better-sqlite3": "^12.6.2",
     "fastify": "^5.7.4",
     "fastify-autoload": "^3.13.0",
     "fastify-plugin": "^5.1.0",
