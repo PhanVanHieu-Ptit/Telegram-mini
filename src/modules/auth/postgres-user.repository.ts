@@ -41,6 +41,29 @@ export class PostgresUserRepository {
     const result = await this.pool.query(query, [id]);
     return result.rows[0] || null;
   }
+
+  async updateAvatar(userId: string, avatarUrl: string): Promise<User> {
+    const query = `
+      UPDATE users
+      SET avatar = $1, updated_at = NOW()
+      WHERE id = $2
+      RETURNING id, username, email, password_hash as "passwordHash", avatar, status, created_at as "createdAt", updated_at as "updatedAt"
+    `;
+    const result = await this.pool.query(query, [avatarUrl, userId]);
+    return result.rows[0];
+  }
+
+  async updateStatus(userId: string, status: string): Promise<User> {
+    const query = `
+      UPDATE users
+      SET status = $1, updated_at = NOW()
+      WHERE id = $2
+      RETURNING id, username, email, password_hash as "passwordHash", avatar, status, created_at as "createdAt", updated_at as "updatedAt"
+    `;
+    const result = await this.pool.query(query, [status, userId]);
+    return result.rows[0];
+  }
 }
+
 
 export const postgresUserRepository = new PostgresUserRepository();

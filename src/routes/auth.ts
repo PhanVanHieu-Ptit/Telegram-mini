@@ -82,6 +82,97 @@ const routes: FastifyPluginAsync = async (fastify) => {
         },
         (request, reply) => authController.login(request, reply),
     );
+
+    fastify.patch<{ Body: { avatar: string } }>(
+        '/update-avatar',
+        {
+            schema: {
+                summary: 'Update user avatar',
+                tags: ['auth'],
+                body: {
+                    type: 'object',
+                    required: ['avatar'],
+                    properties: {
+                        avatar: { type: 'string' },
+                    },
+                },
+                response: {
+                    200: AuthUser,
+                    401: ErrorResponse,
+                    500: ErrorResponse,
+                },
+            },
+            preHandler: async (request, reply) => {
+                const secret = process.env.JWT_SECRET || 'your-secret-key';
+                const authHeader = request.headers.authorization;
+                if (!authHeader?.startsWith('Bearer ')) {
+                    void reply.code(401).send({ error: 'Unauthorized' });
+                    return;
+                }
+                const token = authHeader.substring(7);
+                try {
+                    const decoded = (await new Promise((resolve, reject) => {
+                        import('jsonwebtoken').then(jwt => {
+                            jwt.verify(token, secret, (err, decoded) => {
+                                if (err) reject(err);
+                                else resolve(decoded);
+                            });
+                        });
+                    })) as any;
+                    (request as any).user = decoded;
+                } catch {
+                    void reply.code(401).send({ error: 'Unauthorized' });
+                }
+            },
+        },
+        (request, reply) => authController.updateAvatar(request, reply),
+    );
+
+    fastify.patch<{ Body: { status: string } }>(
+        '/update-status',
+        {
+            schema: {
+                summary: 'Update user status',
+                tags: ['auth'],
+                body: {
+                    type: 'object',
+                    required: ['status'],
+                    properties: {
+                        status: { type: 'string' },
+                    },
+                },
+                response: {
+                    200: AuthUser,
+                    401: ErrorResponse,
+                    500: ErrorResponse,
+                },
+            },
+            preHandler: async (request, reply) => {
+                const secret = process.env.JWT_SECRET || 'your-secret-key';
+                const authHeader = request.headers.authorization;
+                if (!authHeader?.startsWith('Bearer ')) {
+                    void reply.code(401).send({ error: 'Unauthorized' });
+                    return;
+                }
+                const token = authHeader.substring(7);
+                try {
+                    const decoded = (await new Promise((resolve, reject) => {
+                        import('jsonwebtoken').then(jwt => {
+                            jwt.verify(token, secret, (err, decoded) => {
+                                if (err) reject(err);
+                                else resolve(decoded);
+                            });
+                        });
+                    })) as any;
+                    (request as any).user = decoded;
+                } catch {
+                    void reply.code(401).send({ error: 'Unauthorized' });
+                }
+            },
+        },
+        (request, reply) => authController.updateStatus(request, reply),
+    );
 };
+
 
 export default routes;

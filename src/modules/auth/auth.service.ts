@@ -77,6 +77,19 @@ export class AuthService {
       token,
     };
   }
+
+  async updateAvatar(userId: string, avatarUrl: string): Promise<Omit<User, 'passwordHash'>> {
+    const user = await this.userRepository.updateAvatar(userId, avatarUrl);
+    const { passwordHash: _, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  }
+
+  async updateStatus(userId: string, status: string): Promise<Omit<User, 'passwordHash'>> {
+    const user = await this.userRepository.updateStatus(userId, status);
+    const { passwordHash: _, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  }
 }
+
 
 export const authService = new AuthService(postgresUserRepository);

@@ -63,6 +63,47 @@ export class AuthController {
             }
         }
     }
+
+    async updateAvatar(
+        request: FastifyRequest<{ Body: { avatar: string } }>,
+        reply: FastifyReply,
+    ): Promise<void> {
+        try {
+            const userId = (request as any).user?.userId;
+            const { avatar } = request.body;
+
+            if (!userId) {
+                void reply.code(401).send({ error: 'Unauthorized' });
+                return;
+            }
+
+            const user = await this.service.updateAvatar(userId, avatar);
+            void reply.send(user);
+        } catch (error) {
+            void reply.code(500).send({ error: 'Internal server error' });
+        }
+    }
+
+    async updateStatus(
+        request: FastifyRequest<{ Body: { status: string } }>,
+        reply: FastifyReply,
+    ): Promise<void> {
+        try {
+            const userId = (request as any).user?.userId;
+            const { status } = request.body;
+
+            if (!userId) {
+                void reply.code(401).send({ error: 'Unauthorized' });
+                return;
+            }
+
+            const user = await this.service.updateStatus(userId, status);
+            void reply.send(user);
+        } catch (error) {
+            void reply.code(500).send({ error: 'Internal server error' });
+        }
+    }
 }
+
 
 export const authController = new AuthController(authService);
