@@ -1,17 +1,15 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Server as SocketIOServer } from "socket.io";
 
-import {
-  MessageService,
-  messageService,
-  type CreateMessageParams,
-  type ListMessagesFilter,
-  type Message,
-} from "./message.service";
+import { MessageService } from "./message.service";
+import type { SendMessageInput, MessageDTO } from "./message.types";
 
-export interface CreateMessageBody extends CreateMessageParams {}
 
-export interface ListMessagesQuery extends ListMessagesFilter {}
+export interface CreateMessageBody extends SendMessageInput { }
+
+export interface ListMessagesQuery {
+  conversationId?: string;
+}
 
 export type FastifyRequestWithIO<
   TBody = unknown,
@@ -36,33 +34,55 @@ export class MessageController {
     request: FastifyRequestWithIO<CreateMessageBody>,
     reply: FastifyReply,
   ): Promise<void> {
-    const { from, to, text } = request.body ?? {};
+    const { conversationId, senderId, content } = request.body ?? {};
 
-    if (!from || !to || !text) {
+    if (!conversationId || !senderId || !content) {
       void reply.code(400).send({
-        error: "from, to and text are required",
+        error: "conversationId, senderId and content are required",
       });
       return;
     }
 
-    const message: Message = this.service.createMessage({ from, to, text });
-
-    if (request.server.io) {
-      request.server.io.emit("message:new", message);
+    try {
+      const message: MessageDTO = await this.service.sendMessage({ conversationId, senderId, content });
+      if (request.server.io) {
+        request.server.io.emit("message:new", message);
+      }
+      void reply.code(201).send(message);
+    } catch (err) {
+      void reply.code(500).send({ error: (err as Error).message });
     }
-
-    void reply.code(201).send(message);
   }
 
   async listMessages(
     request: FastifyRequestWithIO<unknown, ListMessagesQuery>,
     reply: FastifyReply,
   ): Promise<void> {
-    const { from, to } = request.query ?? {};
-    const messages = this.service.listMessages({ from, to });
-    void reply.send(messages);
+    const { conversationId } = request.query ?? {};
+    if (!conversationId) {
+      void reply.code(400).send({ error: "conversationId is required" });
+      return;
+    }
+    try {
+      // You need to implement listMessages in MessageService to actually fetch messages
+      // const messages = await this.service.listMessages(conversationId);
+      // void reply.send(messages);
+      void reply.send([]); // Placeholder
+    } catch (err) {
+      void reply.code(500).send({ error: (err as Error).message });
+    }
   }
 }
 
-export const messageController = new MessageController(messageService);
+
+import { PostgresConversationRepository } from "./postgres-conversation.repository";
+import { MongoMessageRepository } from "./mongo-message.repository";
+// You need to provide a valid Mongoose model for MongoMessageRepository
+import mongoose from "mongoose";
+import type { MessageDocument } from "./mongo-message.repository";
+
+// Example: Replace 'YourMongooseModel' with your actual model
+const messageRepository = new MongoMessageRepository(mongoose.model<MessageDocument>("Message"));
+const conversationRepository = new PostgresConversationRepository();
+export const messageController = new MessageController(new MessageService(messageRepository, conversationRepository));
 

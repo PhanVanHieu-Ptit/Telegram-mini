@@ -22,7 +22,7 @@ export async function connectMongo(): Promise<Db> {
     throw new Error("MongoDB configuration error");
   }
 
-  if (!mongoClient || mongoClient.topology?.isDestroyed()) {
+  if (!mongoClient) {
     mongoClient = new MongoClient(MONGO_URI);
   }
 
