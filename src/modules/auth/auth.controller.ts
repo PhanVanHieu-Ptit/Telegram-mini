@@ -27,9 +27,11 @@ export class AuthController {
                 return;
             }
 
+            console.log('Registering user:', { username, email });
             const result = await this.service.register({ username, email, password });
             void reply.code(201).send(result);
         } catch (error) {
+            console.error('Register error:', error);
             if (error instanceof Error && error.message === 'User already exists') {
                 void reply.code(409).send({ error: 'User already exists' });
             } else {

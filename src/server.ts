@@ -8,6 +8,7 @@ import autoLoad from "@fastify/autoload";
 
 import { setupSocketIOServer } from "./socket";
 import { connectMongo, pgPool } from "./core/db";
+import { swaggerPlugin } from "./plugins/swagger";
 
 export async function buildServer(
   options: FastifyServerOptions = {}
@@ -17,11 +18,15 @@ export async function buildServer(
     ...options,
   });
 
+  // Register Swagger plugin before routes
+  await app.register(swaggerPlugin);
+
   // Register plugins
   app.register(autoLoad, {
     dir: path.join(__dirname, "plugins"),
     dirNameRoutePrefix: false,
     options: { prefix: "/api" },
+    ignorePattern: /swagger\.(js|ts)$/,
   });
 
   // Register routes

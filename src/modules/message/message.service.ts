@@ -49,4 +49,28 @@ export class MessageService {
       throw new ValidationError("content is required");
     }
   }
+
+  async createConversation(userIds: string[]) {
+    if (!userIds || userIds.length === 0) {
+      throw new ValidationError("At least one user ID is required");
+    }
+    return this.conversationRepository.createConversation(userIds);
+  }
+
+  async getUserConversations(userId: string) {
+    if (!userId?.trim()) {
+      throw new ValidationError("userId is required");
+    }
+    return this.conversationRepository.getUserConversations(userId);
+  }
+
+  async joinConversation(conversationId: string, userId: string) {
+    if (!conversationId?.trim()) {
+      throw new ValidationError("conversationId is required");
+    }
+    if (!userId?.trim()) {
+      throw new ValidationError("userId is required");
+    }
+    return this.conversationRepository.joinConversation(conversationId, userId);
+  }
 }

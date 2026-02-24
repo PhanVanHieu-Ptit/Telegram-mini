@@ -76,7 +76,7 @@ export function setupSocketIOServer(
     }
   });
 
-  fastifyInstance.decorate("io", io);
+  fastifyInstance.io = io;
 
   io.on("connection", (socket) => {
     fastifyInstance.log.info({ socketId: socket.id }, "Socket connected");
