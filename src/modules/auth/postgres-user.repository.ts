@@ -12,9 +12,9 @@ export class PostgresUserRepository {
   async createUser(params: RegisterParams & { passwordHash: string }): Promise<User> {
     const { username, email, passwordHash } = params;
     const query = `
-      INSERT INTO users (username, email, password_hash, created_at, updated_at)
-      VALUES ($1, $2, $3, NOW(), NOW())
-      RETURNING id, username, email, password_hash as "passwordHash", created_at as "createdAt", updated_at as "updatedAt"
+      INSERT INTO users (username, email, password_hash)
+      VALUES ($1, $2, $3)
+      RETURNING id, username, email, password_hash as "passwordHash", avatar, status, created_at as "createdAt", updated_at as "updatedAt"
     `;
     const values = [username, email, passwordHash];
 
@@ -24,7 +24,7 @@ export class PostgresUserRepository {
 
   async findUserByEmail(email: string): Promise<User | null> {
     const query = `
-      SELECT id, username, email, password_hash as "passwordHash", created_at as "createdAt", updated_at as "updatedAt"
+      SELECT id, username, email, password_hash as "passwordHash", avatar, status, created_at as "createdAt", updated_at as "updatedAt"
       FROM users
       WHERE email = $1
     `;
@@ -34,7 +34,7 @@ export class PostgresUserRepository {
 
   async findUserById(id: string): Promise<User | null> {
     const query = `
-      SELECT id, username, email, password_hash as "passwordHash", created_at as "createdAt", updated_at as "updatedAt"
+      SELECT id, username, email, password_hash as "passwordHash", avatar, status, created_at as "createdAt", updated_at as "updatedAt"
       FROM users
       WHERE id = $1
     `;

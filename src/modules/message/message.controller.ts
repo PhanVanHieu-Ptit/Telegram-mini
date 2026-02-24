@@ -72,6 +72,63 @@ export class MessageController {
       void reply.code(500).send({ error: (err as Error).message });
     }
   }
+
+  async createConversation(
+    request: FastifyRequestWithIO<{ userIds: string[] }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const { userIds } = request.body ?? {};
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      void reply.code(400).send({ error: "userIds array is required and must contain at least one user" });
+      return;
+    }
+
+    try {
+      const conversation = await this.service.createConversation(userIds);
+      void reply.code(201).send(conversation);
+    } catch (err) {
+      void reply.code(500).send({ error: (err as Error).message });
+    }
+  }
+
+  async listConversations(
+    request: FastifyRequestWithIO<unknown, { userId: string }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const { userId } = request.query ?? {};
+
+    if (!userId) {
+      void reply.code(400).send({ error: "userId query parameter is required" });
+      return;
+    }
+
+    try {
+      const conversations = await this.service.getUserConversations(userId);
+      void reply.send(conversations);
+    } catch (err) {
+      void reply.code(500).send({ error: (err as Error).message });
+    }
+  }
+
+  async joinConversation(
+    request: FastifyRequestWithIO<{ conversationId: string; userId: string }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const { conversationId, userId } = request.body ?? {};
+
+    if (!conversationId || !userId) {
+      void reply.code(400).send({ error: "conversationId and userId are required" });
+      return;
+    }
+
+    try {
+      await this.service.joinConversation(conversationId, userId);
+      void reply.code(204).send();
+    } catch (err) {
+      void reply.code(500).send({ error: (err as Error).message });
+    }
+  }
 }
 
 

@@ -1,4 +1,7 @@
 import { Pool } from 'pg';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const {
   PG_HOST,
@@ -19,10 +22,12 @@ const pgPool = new Pool({
 async function createUsersTable() {
   const query = `
     CREATE TABLE IF NOT EXISTS users (
-      id SERIAL PRIMARY KEY,
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       username VARCHAR(255) NOT NULL UNIQUE,
       email VARCHAR(255) NOT NULL UNIQUE,
       password_hash VARCHAR(255) NOT NULL,
+      avatar VARCHAR(255),
+      status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'banned')),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -57,7 +62,7 @@ async function createConversationMembersTable() {
   const query = `
     CREATE TABLE IF NOT EXISTS conversation_members (
       conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      user_id UUID REFERENCES users(id) ON DELETE CASCADE,
       joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       PRIMARY KEY (conversation_id, user_id)
     );

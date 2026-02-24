@@ -3,6 +3,8 @@ export interface User {
   username: string;
   email: string;
   passwordHash: string;
+  avatar?: string;
+  status: string;
   createdAt: Date;
   updatedAt: Date;
 }

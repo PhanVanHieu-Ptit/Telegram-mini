@@ -27,6 +27,7 @@ export class AuthController {
                 return;
             }
 
+
             const result = await this.service.register({ username, email, password });
             void reply.code(201).send(result);
         } catch (error) {

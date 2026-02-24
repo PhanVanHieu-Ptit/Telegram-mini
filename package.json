@@ -23,6 +23,9 @@
   "dependencies": {
     "@fastify/autoload": "^6.3.1",
     "@fastify/cors": "^11.2.0",
+    "@fastify/swagger": "^9.7.0",
+    "@fastify/swagger-ui": "^5.2.5",
+    "ajv-formats": "^3.0.1",
     "bcrypt": "^6.0.0",
     "better-sqlite3": "^12.6.2",
     "dotenv": "^17.3.1",
