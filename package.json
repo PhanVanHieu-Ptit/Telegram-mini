@@ -26,6 +26,7 @@
     "fastify": "^5.7.4",
     "fastify-autoload": "^3.13.0",
     "fastify-plugin": "^5.1.0",
+    "mongoose": "^9.2.2",
     "socket.io": "^4.8.3"
   }
 }
