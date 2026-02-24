@@ -1,28 +1,52 @@
+import dotenv from "dotenv";
+dotenv.config();
 import path from "node:path";
 import http from "node:http";
 
-import fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
-import autoLoad from "fastify-autoload";
+import fastify, { FastifyInstance, FastifyServerOptions } from "fastify";
+import autoLoad from "@fastify/autoload";
 
-import setupSocketIOServer from "./socket";
+import { setupSocketIOServer } from "./socket";
+import { connectMongo, pgPool } from "./core/db";
 
 export async function buildServer(
-  options: FastifyServerOptions = {},
+  options: FastifyServerOptions = {}
 ): Promise<FastifyInstance> {
   const app = fastify({
     logger: true,
     ...options,
   });
 
+  // Register plugins
   app.register(autoLoad, {
     dir: path.join(__dirname, "plugins"),
     dirNameRoutePrefix: false,
     options: { prefix: "/api" },
   });
 
+  // Register routes
   app.register(autoLoad, {
     dir: path.join(__dirname, "routes"),
     dirNameRoutePrefix: false,
+  });
+
+  // DB connections
+  app.decorate("mongo", null as any);
+  app.decorate("pgPool", pgPool);
+  app.addHook("onReady", async function () {
+    try {
+      const mongo = await connectMongo();
+      (this as any).mongo = mongo;
+    } catch (err) {
+      this.log.error({ err }, "MongoDB connection failed");
+      throw err;
+    }
+  });
+
+  // Socket integration
+  app.addHook("onListen", async function () {
+    const server = this.server;
+    setupSocketIOServer(server, this);
   });
 
   return app;

@@ -1,4 +1,13 @@
-import type { Model, Document } from "mongoose";
+import mongoose, { Schema, Model, Document } from "mongoose";
+const MessageSchema = new Schema<MessageDocument>({
+  conversationId: { type: String, required: true },
+  senderId: { type: String, required: true },
+  content: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date },
+});
+
+export const MessageModel = mongoose.models.Message || mongoose.model<MessageDocument>("Message", MessageSchema);
 
 import type {
   MessageDTO,
