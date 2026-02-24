@@ -1,9 +1,13 @@
 import type { Server as HttpServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
 import type { FastifyInstance } from "fastify";
+import jwt, { type JwtPayload } from "jsonwebtoken";
 
 import { MessageService } from "./modules/message/message.service";
-import type { SendMessageInput, MessageDTO } from "./modules/message/message.types";
+import type {
+  SendMessageInput,
+  MessageDTO,
+} from "./modules/message/message.types";
 
 export type FastifyInstanceWithIO = FastifyInstance & {
   io?: SocketIOServer;
@@ -26,20 +30,50 @@ export function setupSocketIOServer(
   });
 
   io.use((socket, next) => {
-    const auth = socket.handshake.auth as { userId?: string } | undefined;
-    const queryUserId = socket.handshake.query
-      ?.userId as string | string[] | undefined;
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      return next(new Error("JWT secret not configured"));
+    }
 
-    const userId =
-      auth?.userId ??
-      (Array.isArray(queryUserId) ? queryUserId[0] : queryUserId);
+    const auth = socket.handshake.auth as { token?: string } | undefined;
+    const queryToken = socket.handshake.query
+      ?.token as string | string[] | undefined;
+    const headerAuth =
+      socket.handshake.headers.authorization ||
+      socket.handshake.headers.Authorization;
 
-    if (!userId || !userId.trim()) {
+    let token =
+      auth?.token ??
+      (Array.isArray(queryToken) ? queryToken[0] : queryToken) ??
+      (typeof headerAuth === "string" && headerAuth.startsWith("Bearer ")
+        ? headerAuth.slice("Bearer ".length)
+        : undefined);
+
+    if (!token || !token.trim()) {
       return next(new Error("Unauthorized"));
     }
 
-    socket.data.userId = userId;
-    return next();
+    try {
+      const decoded = jwt.verify(token, secret) as JwtPayload | string;
+      const rawUserId =
+        typeof decoded === "string"
+          ? decoded
+          : (decoded.sub as string | undefined) ??
+            (decoded.userId as string | undefined);
+
+      const userId = rawUserId?.toString().trim();
+
+      if (!userId) {
+        return next(new Error("Unauthorized"));
+      }
+
+      socket.data.userId = userId;
+      socket.join(`user:${userId}`);
+
+      return next();
+    } catch {
+      return next(new Error("Unauthorized"));
+    }
   });
 
   fastifyInstance.decorate("io", io);
