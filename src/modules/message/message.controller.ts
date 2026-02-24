@@ -76,13 +76,13 @@ export class MessageController {
 
 
 import { PostgresConversationRepository } from "./postgres-conversation.repository";
-import { MongoMessageRepository } from "./mongo-message.repository";
+import { MongoMessageRepository, MessageModel } from "./mongo-message.repository";
 // You need to provide a valid Mongoose model for MongoMessageRepository
 import mongoose from "mongoose";
 import type { MessageDocument } from "./mongo-message.repository";
 
 // Example: Replace 'YourMongooseModel' with your actual model
-const messageRepository = new MongoMessageRepository(mongoose.model<MessageDocument>("Message"));
+const messageRepository = new MongoMessageRepository(MessageModel);
 const conversationRepository = new PostgresConversationRepository();
 export const messageController = new MessageController(new MessageService(messageRepository, conversationRepository));
 
