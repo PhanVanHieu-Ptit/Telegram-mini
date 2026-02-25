@@ -31,23 +31,31 @@ const ErrorResponse = {
 };
 
 const ConversationResponse = {
-  type: 'object',
+  type: "object",
   properties: {
-    id: { type: 'string' },
-    createdAt: { type: 'string', format: 'date-time' },
-    updatedAt: { type: 'string', format: 'date-time' },
+    id: { type: "string" },
+    type: { type: "string", enum: ["private", "group"] },
+    name: { type: "string", nullable: true },
+    avatar: { type: "string", nullable: true },
+    createdBy: { type: "string", nullable: true },
+    createdAt: { type: "string", format: "date-time" },
+    updatedAt: { type: "string", format: "date-time", nullable: true },
   },
 };
 
 const CreateConversationBody = {
-  type: 'object',
-  required: ['userIds'],
+  type: "object",
+  required: ["userIds"],
   properties: {
     userIds: {
-      type: 'array',
-      items: { type: 'string' },
+      type: "array",
+      items: { type: "string" },
       minItems: 1,
     },
+    type: { type: "string", enum: ["private", "group"], nullable: true },
+    name: { type: "string", nullable: true },
+    avatar: { type: "string", nullable: true },
+    createdBy: { type: "string", nullable: true },
   },
 };
 
@@ -57,8 +65,8 @@ const routes: FastifyPluginAsync = async (fastify) => {
     '/conversations',
     {
       schema: {
-        summary: 'Create a new conversation',
-        tags: ['conversations'],
+        summary: "Create a new conversation",
+        tags: ["conversations"],
         security: [{ bearerAuth: [] }],
         body: CreateConversationBody,
         response: {
@@ -67,6 +75,7 @@ const routes: FastifyPluginAsync = async (fastify) => {
           500: ErrorResponse,
         },
       },
+      preHandler: fastify.authenticate,
     },
     async (request, reply) => {
       await messageController.createConversation(request as any, reply);
@@ -90,13 +99,14 @@ const routes: FastifyPluginAsync = async (fastify) => {
         },
         response: {
           200: {
-            type: 'array',
+            type: "array",
             items: ConversationResponse,
           },
           400: ErrorResponse,
           500: ErrorResponse,
         },
       },
+      preHandler: fastify.authenticate,
     },
     async (request, reply) => {
       await messageController.listConversations(request as any, reply);
@@ -120,11 +130,12 @@ const routes: FastifyPluginAsync = async (fastify) => {
           },
         },
         response: {
-          204: { description: 'Successfully joined conversation' },
+          200: { description: "Successfully joined conversation" },
           400: ErrorResponse,
           500: ErrorResponse,
         },
       },
+      preHandler: fastify.authenticate,
     },
     async (request, reply) => {
       await messageController.joinConversation(request as any, reply);
@@ -145,6 +156,7 @@ const routes: FastifyPluginAsync = async (fastify) => {
           500: ErrorResponse,
         },
       },
+      preHandler: fastify.authenticate,
     },
     async (request, reply) => {
       await messageController.createMessage(request as any, reply);
@@ -166,7 +178,7 @@ const routes: FastifyPluginAsync = async (fastify) => {
         },
         response: {
           200: {
-            type: 'array',
+            type: "array",
             items: MessageResponse,
           },
           400: ErrorResponse,
@@ -174,6 +186,7 @@ const routes: FastifyPluginAsync = async (fastify) => {
           500: ErrorResponse,
         },
       },
+      preHandler: fastify.authenticate,
     },
     async (request, reply) => {
       await messageController.listMessages(request as any, reply);

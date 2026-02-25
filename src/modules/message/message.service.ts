@@ -2,7 +2,7 @@ import type {
   IConversationRepository,
   IMessageRepository,
 } from "./message.repositories";
-import type { SendMessageInput, MessageDTO } from "./message.types";
+import type { SendMessageInput, MessageDTO, CreateConversationInput } from "./message.types";
 import { ValidationError, UnauthorizedError } from "../../core/errors/AppError";
 
 export class MessageService {
@@ -50,13 +50,7 @@ export class MessageService {
     }
   }
 
-  async createConversation(data: {
-    userIds: string[];
-    type?: "private" | "group";
-    name?: string;
-    avatar?: string;
-    createdBy?: string;
-  }) {
+  async createConversation(data: CreateConversationInput) {
     if (!data.userIds || data.userIds.length === 0) {
       throw new ValidationError("At least one user ID is required");
     }

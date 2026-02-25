@@ -34,3 +34,11 @@ export interface ConversationDTO {
   updatedAt?: string;
 }
 
+export interface CreateConversationInput {
+  userIds: string[];
+  type?: "private" | "group";
+  name?: string;
+  avatar?: string;
+  createdBy?: string;
+}
+
