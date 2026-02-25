@@ -11,6 +11,8 @@ const {
   PG_PASSWORD,
 } = process.env;
 
+import mongoose from "mongoose";
+
 let mongoClient: MongoClient | null = null;
 
 export async function connectMongo(): Promise<Db> {
@@ -22,11 +24,18 @@ export async function connectMongo(): Promise<Db> {
     throw new Error("MongoDB configuration error");
   }
 
-  if (!mongoClient) {
-    mongoClient = new MongoClient(MONGO_URI);
-  }
-
   try {
+    // Connect Mongoose
+    if (mongoose.connection.readyState === 0) {
+      await mongoose.connect(MONGO_URI, {
+        dbName: MONGO_DB_NAME,
+      });
+    }
+
+    if (!mongoClient) {
+      mongoClient = new MongoClient(MONGO_URI);
+    }
+
     await mongoClient.connect();
     const db = mongoClient.db(MONGO_DB_NAME);
     await db.command({ ping: 1 });

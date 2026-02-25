@@ -55,7 +55,7 @@ const routes: FastifyPluginAsync = async (fastify) => {
                 tags: ['auth'],
                 body: AuthRegisterBody,
                 response: {
-                    201: AuthResponse,
+                    200: AuthResponse,
                     400: ErrorResponse,
                     409: ErrorResponse,
                     500: ErrorResponse,

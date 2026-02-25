@@ -8,6 +8,8 @@ import type {
   SendMessageInput,
   MessageDTO,
 } from "./modules/message/message.types";
+import { MongoMessageRepository, MessageModel } from "./modules/message/mongo-message.repository";
+import { PostgresConversationRepository } from "./modules/message/postgres-conversation.repository";
 
 export type FastifyInstanceWithIO = FastifyInstance & {
   io?: SocketIOServer;
@@ -17,9 +19,8 @@ export function setupSocketIOServer(
   httpServer: HttpServer,
   fastifyInstance: FastifyInstanceWithIO,
 ): SocketIOServer {
-  // TODO: inject real implementations of these repositories
-  const messageRepository = {} as unknown as import("./modules/message/message.repositories").IMessageRepository;
-  const conversationRepository = {} as unknown as import("./modules/message/message.repositories").IConversationRepository;
+  const messageRepository = new MongoMessageRepository(MessageModel);
+  const conversationRepository = new PostgresConversationRepository();
   const messageService = new MessageService(messageRepository, conversationRepository);
 
   const io = new SocketIOServer(httpServer, {
@@ -59,7 +60,7 @@ export function setupSocketIOServer(
         typeof decoded === "string"
           ? decoded
           : (decoded.sub as string | undefined) ??
-            (decoded.userId as string | undefined);
+          (decoded.userId as string | undefined);
 
       const userId = rawUserId?.toString().trim();
 
@@ -182,4 +183,3 @@ export function setupSocketIOServer(
 }
 
 export default setupSocketIOServer;
-
