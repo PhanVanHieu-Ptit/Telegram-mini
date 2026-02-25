@@ -11,8 +11,10 @@ export interface MessageEntity {
   conversationId: string;
   senderId: string;
   content: string;
+  type: string;
+  seenBy: string[];
   createdAt: Date;
-  updatedAt: Date;
+  updatedAt?: Date;
 }
 
 export interface MessageDTO {
@@ -20,6 +22,8 @@ export interface MessageDTO {
   conversationId: string;
   senderId: string;
   content: string;
+  type: string;
+  seenBy: string[];
   createdAt: string;
   updatedAt?: string;
 }

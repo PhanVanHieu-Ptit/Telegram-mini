@@ -70,7 +70,7 @@ const routes: FastifyPluginAsync = async (fastify) => {
         security: [{ bearerAuth: [] }],
         body: CreateConversationBody,
         response: {
-          201: ConversationResponse,
+          200: ConversationResponse,
           400: ErrorResponse,
           500: ErrorResponse,
         },
@@ -150,7 +150,7 @@ const routes: FastifyPluginAsync = async (fastify) => {
         security: [{ bearerAuth: [] }],
         body: MessageRequestBody,
         response: {
-          201: MessageResponse,
+          200: MessageResponse,
           400: ErrorResponse,
           401: ErrorResponse,
           500: ErrorResponse,
@@ -172,6 +172,7 @@ const routes: FastifyPluginAsync = async (fastify) => {
         security: [{ bearerAuth: [] }],
         querystring: {
           type: 'object',
+          required: ['conversationId'],
           properties: {
             conversationId: { type: 'string' },
           },

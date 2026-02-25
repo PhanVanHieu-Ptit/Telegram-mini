@@ -73,4 +73,17 @@ export class MessageService {
     }
     return this.conversationRepository.joinConversation(conversationId, userId);
   }
+
+  async listMessages(conversationId: string, userId: string): Promise<MessageDTO[]> {
+    if (!conversationId?.trim()) {
+      throw new ValidationError("conversationId is required");
+    }
+
+    const isMember = await this.conversationRepository.isMember(conversationId, userId);
+    if (!isMember) {
+      throw new UnauthorizedError("User is not a member of this conversation");
+    }
+
+    return this.messageRepository.findByConversationId(conversationId);
+  }
 }

@@ -6,7 +6,7 @@ import type {
 
 export interface IMessageRepository {
   create(
-    data: Pick<MessageEntity, "conversationId" | "senderId" | "content">,
+    data: Pick<MessageEntity, "conversationId" | "senderId" | "content"> & Partial<Pick<MessageEntity, "type" | "seenBy">>,
   ): Promise<MessageDTO>;
 
   findById(id: string): Promise<MessageDTO | null>;
