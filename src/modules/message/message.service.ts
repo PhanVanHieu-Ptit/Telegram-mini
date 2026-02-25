@@ -9,7 +9,7 @@ export class MessageService {
   constructor(
     private readonly messageRepository: IMessageRepository,
     private readonly conversationRepository: IConversationRepository,
-  ) {}
+  ) { }
 
   async sendMessage(input: SendMessageInput): Promise<MessageDTO> {
     this.validateInput(input);
@@ -50,11 +50,17 @@ export class MessageService {
     }
   }
 
-  async createConversation(userIds: string[]) {
-    if (!userIds || userIds.length === 0) {
+  async createConversation(data: {
+    userIds: string[];
+    type?: "private" | "group";
+    name?: string;
+    avatar?: string;
+    createdBy?: string;
+  }) {
+    if (!data.userIds || data.userIds.length === 0) {
       throw new ValidationError("At least one user ID is required");
     }
-    return this.conversationRepository.createConversation(userIds);
+    return this.conversationRepository.createConversation(data);
   }
 
   async getUserConversations(userId: string) {

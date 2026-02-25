@@ -27,7 +27,13 @@ export interface IConversationRepository {
     messageId: string,
   ): Promise<void>;
 
-  createConversation(userIds: string[]): Promise<ConversationDTO>;
+  createConversation(data: {
+    userIds: string[];
+    type?: "private" | "group";
+    name?: string;
+    avatar?: string;
+    createdBy?: string;
+  }): Promise<ConversationDTO>;
 
   getUserConversations(userId: string): Promise<ConversationDTO[]>;
 

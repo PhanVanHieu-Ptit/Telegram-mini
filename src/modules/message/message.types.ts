@@ -26,6 +26,10 @@ export interface MessageDTO {
 
 export interface ConversationDTO {
   id: string;
+  type: 'private' | 'group';
+  name?: string | null;
+  avatar?: string | null;
+  createdBy?: string | null;
   createdAt: string;
   updatedAt?: string;
 }

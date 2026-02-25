@@ -45,6 +45,10 @@ async function createConversationsTable() {
   const query = `
     CREATE TABLE IF NOT EXISTS conversations (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      type VARCHAR(20) DEFAULT 'private' CHECK (type IN ('private', 'group')),
+      name VARCHAR(255),
+      avatar VARCHAR(255),
+      created_by UUID REFERENCES users(id),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -63,7 +67,9 @@ async function createConversationMembersTable() {
     CREATE TABLE IF NOT EXISTS conversation_members (
       conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
       user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+      role VARCHAR(20) DEFAULT 'member' CHECK (role IN ('member', 'admin', 'owner')),
       joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      last_read_message_id VARCHAR(255),
       PRIMARY KEY (conversation_id, user_id)
     );
   `;
@@ -76,30 +82,12 @@ async function createConversationMembersTable() {
   }
 }
 
-async function createConversationReadStatusTable() {
-  const query = `
-    CREATE TABLE IF NOT EXISTS conversation_read_status (
-      conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
-      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-      last_read_message_id VARCHAR(255),
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      PRIMARY KEY (conversation_id, user_id)
-    );
-  `;
 
-  try {
-    await pgPool.query(query);
-    console.log('Conversation read status table created successfully');
-  } catch (error) {
-    console.error('Error creating conversation read status table:', error);
-  }
-}
 
 async function createTables() {
   await createUsersTable();
   await createConversationsTable();
   await createConversationMembersTable();
-  await createConversationReadStatusTable();
   await pgPool.end();
 }
 
