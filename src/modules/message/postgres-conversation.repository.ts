@@ -5,6 +5,10 @@ import type { ConversationDTO } from "./message.types";
 
 interface ConversationRow {
   id: string;
+  type: 'private' | 'group';
+  name: string | null;
+  avatar: string | null;
+  created_by: string | null;
   created_at: Date;
   updated_at: Date | null;
 }
@@ -51,7 +55,7 @@ export class PostgresConversationRepository implements IConversationRepository {
   ): Promise<ConversationRow | null> {
     const result = await pgPool.query<ConversationRow>(
       `
-        SELECT id, created_at, updated_at
+        SELECT id, type, name, avatar, created_by, created_at, updated_at
         FROM conversations
         WHERE id = $1
         LIMIT 1
@@ -73,18 +77,22 @@ export class PostgresConversationRepository implements IConversationRepository {
   ): Promise<void> {
     await pgPool.query(
       `
-        INSERT INTO conversation_read_status (conversation_id, user_id, last_read_message_id, updated_at)
-        VALUES ($1, $2, $3, NOW())
-        ON CONFLICT (conversation_id, user_id)
-        DO UPDATE SET
-          last_read_message_id = EXCLUDED.last_read_message_id,
-          updated_at = NOW()
+        UPDATE conversation_members
+        SET last_read_message_id = $3
+        WHERE conversation_id = $1 AND user_id = $2
       `,
       [conversationId, userId, messageId],
     );
   }
 
-  async createConversation(userIds: string[]): Promise<ConversationDTO> {
+  async createConversation(data: {
+    userIds: string[];
+    type?: "private" | "group";
+    name?: string;
+    avatar?: string;
+    createdBy?: string;
+  }): Promise<ConversationDTO> {
+    const { userIds, type = "private", name, avatar, createdBy } = data;
     const client = await pgPool.connect();
 
     try {
@@ -92,25 +100,35 @@ export class PostgresConversationRepository implements IConversationRepository {
 
       const conversationResult = await client.query<ConversationRow>(
         `
-          INSERT INTO conversations DEFAULT VALUES
-          RETURNING id, created_at, updated_at
+          INSERT INTO conversations (type, name, avatar, created_by)
+          VALUES ($1, $2, $3, $4)
+          RETURNING id, type, name, avatar, created_by, created_at, updated_at
         `,
+        [type, name || null, avatar || null, createdBy || null],
       );
 
       const conversation = conversationResult.rows[0];
 
       if (userIds.length > 0) {
-        const values = userIds
-          .map((_, index) => `($1, $${index + 2})`)
+        // Prepare data for members insertion
+        const memberEntries = userIds.map((uid) => ({
+          uid,
+          role: uid === createdBy ? 'owner' : 'member'
+        }));
+
+        const values = memberEntries
+          .map((_, index) => `($1, $${index * 2 + 2}, $${index * 2 + 3})`)
           .join(", ");
+
+        const flatValues = memberEntries.flatMap(m => [m.uid, m.role]);
 
         await client.query(
           `
-            INSERT INTO conversation_members (conversation_id, user_id)
+            INSERT INTO conversation_members (conversation_id, user_id, role)
             VALUES ${values}
             ON CONFLICT (conversation_id, user_id) DO NOTHING
           `,
-          [conversation.id, ...userIds],
+          [conversation.id, ...flatValues],
         );
       }
 
@@ -118,6 +136,10 @@ export class PostgresConversationRepository implements IConversationRepository {
 
       return {
         id: conversation.id,
+        type: conversation.type,
+        name: conversation.name,
+        avatar: conversation.avatar,
+        createdBy: conversation.created_by,
         createdAt: conversation.created_at.toISOString(),
         updatedAt: conversation.updated_at?.toISOString(),
       };
@@ -132,7 +154,7 @@ export class PostgresConversationRepository implements IConversationRepository {
   async getUserConversations(userId: string): Promise<ConversationDTO[]> {
     const result = await pgPool.query<ConversationRow>(
       `
-        SELECT c.id, c.created_at, c.updated_at
+        SELECT c.id, c.type, c.name, c.avatar, c.created_by, c.created_at, c.updated_at
         FROM conversations c
         INNER JOIN conversation_members cm
           ON cm.conversation_id = c.id
@@ -144,6 +166,10 @@ export class PostgresConversationRepository implements IConversationRepository {
 
     return result.rows.map((row) => ({
       id: row.id,
+      type: row.type,
+      name: row.name,
+      avatar: row.avatar,
+      createdBy: row.created_by,
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at?.toISOString(),
     }));
