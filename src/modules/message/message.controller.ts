@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Server as SocketIOServer } from "socket.io";
 
 import { MessageService } from "./message.service";
-import type { SendMessageInput, MessageDTO } from "./message.types";
+import type { SendMessageInput, MessageDTO, CreateConversationInput } from "./message.types";
 
 
 export interface CreateMessageBody extends SendMessageInput { }
@@ -49,8 +49,9 @@ export class MessageController {
         request.server.io.emit("message:new", message);
       }
       void reply.code(201).send(message);
-    } catch (err) {
-      void reply.code(500).send({ error: (err as Error).message });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
     }
   }
 
@@ -68,16 +69,18 @@ export class MessageController {
       // const messages = await this.service.listMessages(conversationId);
       // void reply.send(messages);
       void reply.send([]); // Placeholder
-    } catch (err) {
-      void reply.code(500).send({ error: (err as Error).message });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
     }
   }
 
   async createConversation(
-    request: FastifyRequestWithIO<{ userIds: string[] }>,
+    request: FastifyRequestWithIO<CreateConversationInput>,
     reply: FastifyReply,
   ): Promise<void> {
-    const { userIds } = request.body ?? {};
+    const { userIds, createdBy } = request.body ?? {};
+    const authenticatedUser = (request as any).user;
 
     if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
       void reply.code(400).send({ error: "userIds array is required and must contain at least one user" });
@@ -85,10 +88,21 @@ export class MessageController {
     }
 
     try {
-      const conversation = await this.service.createConversation(userIds);
+      // Use authenticated user ID as creator if not provided
+      const finalCreatedBy = createdBy || authenticatedUser?.userId;
+
+      // Ensure creator is in userIds
+      const finalUserIds = [...new Set([...userIds, finalCreatedBy])].filter(Boolean) as string[];
+
+      const conversation = await this.service.createConversation({
+        ...request.body,
+        userIds: finalUserIds,
+        createdBy: finalCreatedBy,
+      });
       void reply.code(201).send(conversation);
-    } catch (err) {
-      void reply.code(500).send({ error: (err as Error).message });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
     }
   }
 
@@ -106,8 +120,9 @@ export class MessageController {
     try {
       const conversations = await this.service.getUserConversations(userId);
       void reply.send(conversations);
-    } catch (err) {
-      void reply.code(500).send({ error: (err as Error).message });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
     }
   }
 
@@ -124,9 +139,10 @@ export class MessageController {
 
     try {
       await this.service.joinConversation(conversationId, userId);
-      void reply.code(204).send();
-    } catch (err) {
-      void reply.code(500).send({ error: (err as Error).message });
+      void reply.code(200).send();
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
     }
   }
 }

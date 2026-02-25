@@ -16,6 +16,10 @@ export const sendMessageSchema = z.object({
 // Create conversation validator
 export const createConversationSchema = z.object({
   userIds: z.array(z.string().uuid()).min(1),
+  type: z.enum(['private', 'group']).optional().nullable(),
+  name: z.string().optional().nullable(),
+  avatar: z.string().optional().nullable(),
+  createdBy: z.string().uuid().optional().nullable(),
 });
 
 // Type exports for TypeScript
