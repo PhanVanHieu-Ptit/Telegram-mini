@@ -70,6 +70,7 @@ async function createConversationMembersTable() {
       role VARCHAR(20) DEFAULT 'member' CHECK (role IN ('member', 'admin', 'owner')),
       joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       last_read_message_id VARCHAR(255),
+      unread_count INTEGER DEFAULT 0,
       PRIMARY KEY (conversation_id, user_id)
     );
   `;

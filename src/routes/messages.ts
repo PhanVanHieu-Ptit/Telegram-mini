@@ -193,6 +193,77 @@ const routes: FastifyPluginAsync = async (fastify) => {
       await messageController.listMessages(request as any, reply);
     },
   );
+
+  // Typing indicator endpoint
+  fastify.post(
+    '/typing',
+    {
+      schema: {
+        summary: 'Send typing indicator',
+        tags: ['messages'],
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['conversationId', 'userId', 'isTyping'],
+          properties: {
+            conversationId: { type: 'string' },
+            userId: { type: 'string' },
+            isTyping: { type: 'boolean' },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+            },
+          },
+          400: ErrorResponse,
+          401: ErrorResponse,
+          500: ErrorResponse,
+        },
+      },
+      preHandler: fastify.authenticate,
+    },
+    async (request, reply) => {
+      await messageController.typing(request as any, reply);
+    },
+  );
+
+  // Mark messages as seen endpoint
+  fastify.post(
+    '/seen',
+    {
+      schema: {
+        summary: 'Mark messages as seen',
+        tags: ['messages'],
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['conversationId', 'userId'],
+          properties: {
+            conversationId: { type: 'string' },
+            userId: { type: 'string' },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+            },
+          },
+          400: ErrorResponse,
+          401: ErrorResponse,
+          500: ErrorResponse,
+        },
+      },
+      preHandler: fastify.authenticate,
+    },
+    async (request, reply) => {
+      await messageController.markAsSeen(request as any, reply);
+    },
+  );
 };
 
 export default routes;

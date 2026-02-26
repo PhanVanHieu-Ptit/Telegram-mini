@@ -10,6 +10,7 @@ import type {
 } from "./modules/message/message.types";
 import { MongoMessageRepository, MessageModel } from "./modules/message/mongo-message.repository";
 import { PostgresConversationRepository } from "./modules/message/postgres-conversation.repository";
+import { MqttService } from "./modules/mqtt/mqtt.service";
 
 export type FastifyInstanceWithIO = FastifyInstance & {
   io?: SocketIOServer;
@@ -21,7 +22,8 @@ export function setupSocketIOServer(
 ): SocketIOServer {
   const messageRepository = new MongoMessageRepository(MessageModel);
   const conversationRepository = new PostgresConversationRepository();
-  const messageService = new MessageService(messageRepository, conversationRepository);
+  const mqttService = new MqttService();
+  const messageService = new MessageService(messageRepository, conversationRepository, mqttService);
 
   const io = new SocketIOServer(httpServer, {
     cors: {

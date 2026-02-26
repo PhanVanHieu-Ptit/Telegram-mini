@@ -28,7 +28,7 @@ export class MongoMessageRepository implements IMessageRepository {
 
   private mapMessage(doc: MessageDocument): MessageDTO {
     return {
-      id: doc.id,
+      id: doc._id?.toString() || doc.id,
       conversationId: doc.conversationId,
       senderId: doc.senderId,
       content: doc.content,
@@ -69,5 +69,14 @@ export class MongoMessageRepository implements IMessageRepository {
   async deleteById(id: string): Promise<void> {
     await this.messageModel.findByIdAndDelete(id).exec();
   }
+
+  async markMessagesSeen(conversationId: string, userId: string): Promise<void> {
+    await this.messageModel.updateMany(
+      { conversationId, seenBy: { $ne: userId } },
+      { $addToSet: { seenBy: userId } },
+    ).exec();
+  }
 }
+
+export const mongoMessageRepository = new MongoMessageRepository(MessageModel);
 

@@ -1,4 +1,5 @@
 import { pgPool } from "../../core/db";
+import { AppError } from "../../core/errors/AppError";
 
 import type { IConversationRepository } from "./message.repositories";
 import type { ConversationDTO } from "./message.types";
@@ -14,6 +15,46 @@ interface ConversationRow {
 }
 
 export class PostgresConversationRepository implements IConversationRepository {
+  async validateMember(conversationId: string, userId: string): Promise<void> {
+    const isMember = await this.isMember(conversationId, userId);
+    if (!isMember) {
+      throw new AppError("User is not a member of this conversation", 403, "FORBIDDEN");
+    }
+  }
+
+  async updateLastMessage(conversationId: string, messageId: string): Promise<void> {
+    await pgPool.query(
+      `
+        UPDATE conversations
+        SET last_message_id = $2, updated_at = NOW()
+        WHERE id = $1
+      `,
+      [conversationId, messageId],
+    );
+  }
+
+  async incrementUnread(conversationId: string, userId: string): Promise<void> {
+    await pgPool.query(
+      `
+        UPDATE conversation_members
+        SET unread_count = unread_count + 1
+        WHERE conversation_id = $1 AND user_id = $2
+      `,
+      [conversationId, userId],
+    );
+  }
+
+  async resetUnread(conversationId: string, userId: string): Promise<void> {
+    await pgPool.query(
+      `
+        UPDATE conversation_members
+        SET unread_count = 0
+        WHERE conversation_id = $1 AND user_id = $2
+      `,
+      [conversationId, userId],
+    );
+  }
+
   async updateUpdatedAt(conversationId: string): Promise<void> {
     await pgPool.query(
       `
