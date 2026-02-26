@@ -1,4 +1,5 @@
 import mqtt, { IClientOptions, MqttClient } from "mqtt";
+import { presenceService } from "./presence.service";
 
 export class MqttService {
     private client: MqttClient | null = null;
@@ -25,21 +26,33 @@ export class MqttService {
         await this.waitForConnect();
     }
 
-    async publish(topic: string, payload: unknown): Promise<void> {
+    async publish(
+        topic: string,
+        payload: unknown,
+        options?: { qos?: 0 | 1 | 2; retain?: boolean },
+    ): Promise<void> {
         this.assertValidTopic(topic);
 
         const client = await this.ensureConnectedClient();
         const message = JSON.stringify(payload);
 
         await new Promise<void>((resolve, reject) => {
-            client.publish(topic, message, (error?: Error) => {
-                if (error) {
-                    reject(error);
-                    return;
-                }
+            client.publish(
+                topic,
+                message,
+                {
+                    qos: options?.qos ?? 0,
+                    retain: options?.retain ?? false,
+                },
+                (error?: Error) => {
+                    if (error) {
+                        reject(error);
+                        return;
+                    }
 
-                resolve();
-            });
+                    resolve();
+                },
+            );
         });
     }
 
@@ -63,6 +76,32 @@ export class MqttService {
                 resolve();
             });
         });
+    }
+
+    async markUserOnline(userId: string): Promise<void> {
+        presenceService.markOnline(userId);
+
+        const topic = `presence/${userId}`;
+        const payload = {
+            userId,
+            online: true,
+            lastSeen: null,
+        };
+
+        await this.publish(topic, payload, { qos: 1 });
+    }
+
+    async markUserOffline(userId: string): Promise<void> {
+        presenceService.markOffline(userId);
+
+        const topic = `presence/${userId}`;
+        const payload = {
+            userId,
+            online: false,
+            lastSeen: new Date(),
+        };
+
+        await this.publish(topic, payload, { qos: 1 });
     }
 
     async disconnect(): Promise<void> {
