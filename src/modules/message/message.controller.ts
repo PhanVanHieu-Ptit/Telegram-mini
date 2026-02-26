@@ -3,6 +3,7 @@ import type { Server as SocketIOServer } from "socket.io";
 
 import { MessageService } from "./message.service";
 import type { SendMessageInput, MessageDTO, CreateConversationInput } from "./message.types";
+import { MqttService } from "../mqtt/mqtt.service";
 
 
 export interface CreateMessageBody extends SendMessageInput { }
@@ -151,6 +152,46 @@ export class MessageController {
       void reply.code(statusCode).send({ error: (err as Error).message });
     }
   }
+
+  async typing(
+    request: FastifyRequestWithIO<{ conversationId: string; userId: string; isTyping: boolean }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const { conversationId, userId, isTyping } = request.body ?? {};
+
+    if (!conversationId || !userId || typeof isTyping !== 'boolean') {
+      void reply.code(400).send({ error: "conversationId, userId, and isTyping are required" });
+      return;
+    }
+
+    try {
+      await this.service.typing(conversationId, userId, isTyping);
+      void reply.code(200).send({ success: true });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
+    }
+  }
+
+  async markAsSeen(
+    request: FastifyRequestWithIO<{ conversationId: string; userId: string }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const { conversationId, userId } = request.body ?? {};
+
+    if (!conversationId || !userId) {
+      void reply.code(400).send({ error: "conversationId and userId are required" });
+      return;
+    }
+
+    try {
+      await this.service.markAsSeen(conversationId, userId);
+      void reply.code(200).send({ success: true });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
+    }
+  }
 }
 
 
@@ -163,5 +204,6 @@ import type { MessageDocument } from "./mongo-message.repository";
 // Example: Replace 'YourMongooseModel' with your actual model
 const messageRepository = new MongoMessageRepository(MessageModel);
 const conversationRepository = new PostgresConversationRepository();
-export const messageController = new MessageController(new MessageService(messageRepository, conversationRepository));
+const mqttService = new MqttService();
+export const messageController = new MessageController(new MessageService(messageRepository, conversationRepository, mqttService));
 

@@ -1,3 +1,4 @@
+
 import type {
   ConversationDTO,
   MessageDTO,
@@ -14,6 +15,8 @@ export interface IMessageRepository {
   findByConversationId(conversationId: string): Promise<MessageDTO[]>;
 
   deleteById(id: string): Promise<void>;
+
+  markMessagesSeen(conversationId: string, userId: string): Promise<void>;
 }
 
 export interface IConversationRepository {
@@ -26,6 +29,8 @@ export interface IConversationRepository {
     userId: string,
     messageId: string,
   ): Promise<void>;
+
+  resetUnread(conversationId: string, userId: string): Promise<void>;
 
   createConversation(data: {
     userIds: string[];
