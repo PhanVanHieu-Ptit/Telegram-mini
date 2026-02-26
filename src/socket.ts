@@ -11,6 +11,7 @@ import type {
 import { MongoMessageRepository, MessageModel } from "./modules/message/mongo-message.repository";
 import { PostgresConversationRepository } from "./modules/message/postgres-conversation.repository";
 import { MqttService } from "./modules/mqtt/mqtt.service";
+import { presenceService } from "./modules/mqtt/presence.service";
 
 export type FastifyInstanceWithIO = FastifyInstance & {
   io?: SocketIOServer;
@@ -24,6 +25,17 @@ export function setupSocketIOServer(
   const conversationRepository = new PostgresConversationRepository();
   const mqttService = new MqttService();
   const messageService = new MessageService(messageRepository, conversationRepository, mqttService);
+
+  // Initialize heartbeat system asynchronously
+  (async () => {
+    try {
+      await mqttService.connect();
+      await presenceService.initializeHeartbeat(mqttService);
+      fastifyInstance.log.info("Heartbeat system initialized");
+    } catch (error) {
+      fastifyInstance.log.error({ error }, "Failed to initialize heartbeat system");
+    }
+  })();
 
   const io = new SocketIOServer(httpServer, {
     cors: {
