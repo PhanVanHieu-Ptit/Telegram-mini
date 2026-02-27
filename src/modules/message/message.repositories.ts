@@ -1,6 +1,7 @@
 
 import type {
   ConversationDTO,
+  ConversationListItemDTO,
   MessageDTO,
   MessageEntity,
 } from "./message.types";
@@ -40,7 +41,7 @@ export interface IConversationRepository {
     createdBy?: string;
   }): Promise<ConversationDTO>;
 
-  getUserConversations(userId: string): Promise<ConversationDTO[]>;
+  getUserConversations(userId: string): Promise<ConversationListItemDTO[]>;
 
   joinConversation(
     conversationId: string,
