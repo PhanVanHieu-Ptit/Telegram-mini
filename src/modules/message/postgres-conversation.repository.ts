@@ -2,7 +2,7 @@ import { pgPool } from "../../core/db";
 import { AppError } from "../../core/errors/AppError";
 
 import type { IConversationRepository } from "./message.repositories";
-import type { ConversationDTO, ConversationListItemDTO, MessageDTO } from "./message.types";
+import type { ConversationDTO, ConversationListItemDTO, MessageDTO, ConversationMember } from "./message.types";
 
 interface ConversationRow {
   id: string;
@@ -197,6 +197,7 @@ export class PostgresConversationRepository implements IConversationRepository {
       const result = await pgPool.query<{
         id: string;
         participant_ids: string;
+        members_json: string;
         unread_count: number;
         pinned: boolean;
         muted: boolean;
@@ -207,6 +208,15 @@ export class PostgresConversationRepository implements IConversationRepository {
           SELECT
             c.id,
             string_agg(DISTINCT cm.user_id::text, ',') as participant_ids,
+            json_agg(
+              json_build_object(
+                'id', u.id,
+                'fullName', COALESCE(u.username, ''),
+                'avatarUrl', u.avatar,
+                'email', u.email,
+                'role', cm.role
+              )
+            ) FILTER (WHERE u.id IS NOT NULL)::text as members_json,
             cm_user.unread_count,
             cm_user.pinned,
             cm_user.muted,
@@ -215,6 +225,8 @@ export class PostgresConversationRepository implements IConversationRepository {
           FROM conversations c
           INNER JOIN conversation_members cm
             ON cm.conversation_id = c.id
+          LEFT JOIN users u
+            ON u.id = cm.user_id
           INNER JOIN conversation_members cm_user
             ON cm_user.conversation_id = c.id AND cm_user.user_id = $1::uuid
           GROUP BY c.id, c.updated_at, c.last_message_id, cm_user.unread_count, cm_user.pinned, cm_user.muted
@@ -227,6 +239,21 @@ export class PostgresConversationRepository implements IConversationRepository {
       const conversations: ConversationListItemDTO[] = [];
       for (const row of result.rows) {
         const participantIds = row.participant_ids ? row.participant_ids.split(',').map(id => id.trim()) : [];
+
+        // Parse members from JSON
+        let members: ConversationMember[] = [];
+        try {
+          if (row.members_json) {
+            // Handle both string and object cases
+            const membersData = typeof row.members_json === 'string'
+              ? JSON.parse(row.members_json)
+              : row.members_json;
+            members = Array.isArray(membersData) ? membersData : [];
+          }
+        } catch (error) {
+          console.error('Failed to parse members JSON:', error);
+          members = [];
+        }
 
         let lastMessage: MessageDTO | undefined;
         if (row.last_message_id) {
@@ -241,6 +268,7 @@ export class PostgresConversationRepository implements IConversationRepository {
         conversations.push({
           id: row.id,
           participantIds,
+          members,
           lastMessage,
           unreadCount: row.unread_count || 0,
           pinned: row.pinned || false,

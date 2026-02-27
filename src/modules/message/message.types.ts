@@ -38,9 +38,19 @@ export interface ConversationDTO {
   updatedAt?: string;
 }
 
+export interface ConversationMember {
+  id: string;
+  fullName: string;
+  avatarUrl?: string | null;
+  email: string;
+  role: string;
+  isOnline?: boolean;
+}
+
 export interface ConversationListItemDTO {
   id: string;
   participantIds: string[];
+  members: ConversationMember[];
   lastMessage?: MessageDTO;
   unreadCount: number;
   pinned: boolean;
