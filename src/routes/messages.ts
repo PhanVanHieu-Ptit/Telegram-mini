@@ -30,6 +30,19 @@ const ErrorResponse = {
   },
 };
 
+const ConversationMemberSchema = {
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    fullName: { type: "string" },
+    avatarUrl: { type: "string", nullable: true },
+    email: { type: "string" },
+    role: { type: "string" },
+    isOnline: { type: "boolean", nullable: true },
+  },
+  required: ["id", "fullName", "email", "role"],
+};
+
 const ConversationResponse = {
   type: "object",
   properties: {
@@ -37,6 +50,10 @@ const ConversationResponse = {
     participantIds: {
       type: "array",
       items: { type: "string" }
+    },
+    members: {
+      type: "array",
+      items: ConversationMemberSchema,
     },
     lastMessage: {
       type: "object",
