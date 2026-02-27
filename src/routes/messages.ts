@@ -34,12 +34,28 @@ const ConversationResponse = {
   type: "object",
   properties: {
     id: { type: "string" },
-    type: { type: "string", enum: ["private", "group"] },
-    name: { type: "string", nullable: true },
-    avatar: { type: "string", nullable: true },
-    createdBy: { type: "string", nullable: true },
-    createdAt: { type: "string", format: "date-time" },
-    updatedAt: { type: "string", format: "date-time", nullable: true },
+    participantIds: {
+      type: "array",
+      items: { type: "string" }
+    },
+    lastMessage: {
+      type: "object",
+      nullable: true,
+      properties: {
+        id: { type: "string" },
+        conversationId: { type: "string" },
+        senderId: { type: "string" },
+        content: { type: "string" },
+        type: { type: "string" },
+        seenBy: { type: "array", items: { type: "string" } },
+        createdAt: { type: "string", format: "date-time" },
+        updatedAt: { type: "string", format: "date-time", nullable: true },
+      },
+    },
+    unreadCount: { type: "number" },
+    pinned: { type: "boolean" },
+    muted: { type: "boolean" },
+    updatedAt: { type: "string", format: "date-time" },
   },
 };
 
@@ -106,7 +122,9 @@ const routes: FastifyPluginAsync = async (fastify) => {
           500: ErrorResponse,
         },
       },
-      preHandler: fastify.authenticate,
+      preHandler: async (request, reply) => {
+        await (fastify as any).authenticate(request, reply);
+      },
     },
     async (request, reply) => {
       await messageController.listConversations(request as any, reply);

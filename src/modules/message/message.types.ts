@@ -38,6 +38,16 @@ export interface ConversationDTO {
   updatedAt?: string;
 }
 
+export interface ConversationListItemDTO {
+  id: string;
+  participantIds: string[];
+  lastMessage?: MessageDTO;
+  unreadCount: number;
+  pinned: boolean;
+  muted: boolean;
+  updatedAt: string;
+}
+
 export interface CreateConversationInput {
   userIds: string[];
   type?: "private" | "group";

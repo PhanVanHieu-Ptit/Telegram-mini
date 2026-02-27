@@ -49,6 +49,7 @@ async function createConversationsTable() {
       name VARCHAR(255),
       avatar VARCHAR(255),
       created_by UUID REFERENCES users(id),
+      last_message_id VARCHAR(255),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
@@ -71,6 +72,8 @@ async function createConversationMembersTable() {
       joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       last_read_message_id VARCHAR(255),
       unread_count INTEGER DEFAULT 0,
+      pinned BOOLEAN DEFAULT FALSE,
+      muted BOOLEAN DEFAULT FALSE,
       PRIMARY KEY (conversation_id, user_id)
     );
   `;

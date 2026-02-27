@@ -25,6 +25,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
             (request as any).user = decoded;
         } catch (err) {
             void reply.code(401).send({ error: "Unauthorized" });
+            return;
         }
     });
 };

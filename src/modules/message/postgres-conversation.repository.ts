@@ -2,7 +2,7 @@ import { pgPool } from "../../core/db";
 import { AppError } from "../../core/errors/AppError";
 
 import type { IConversationRepository } from "./message.repositories";
-import type { ConversationDTO } from "./message.types";
+import type { ConversationDTO, ConversationListItemDTO, MessageDTO } from "./message.types";
 
 interface ConversationRow {
   id: string;
@@ -192,28 +192,74 @@ export class PostgresConversationRepository implements IConversationRepository {
     }
   }
 
-  async getUserConversations(userId: string): Promise<ConversationDTO[]> {
-    const result = await pgPool.query<ConversationRow>(
-      `
-        SELECT c.id, c.type, c.name, c.avatar, c.created_by, c.created_at, c.updated_at
-        FROM conversations c
-        INNER JOIN conversation_members cm
-          ON cm.conversation_id = c.id
-        WHERE cm.user_id = $1
-        ORDER BY COALESCE(c.updated_at, c.created_at) DESC
-      `,
-      [userId],
-    );
+  async getUserConversations(userId: string): Promise<ConversationListItemDTO[]> {
+    try {
+      const result = await pgPool.query<{
+        id: string;
+        participant_ids: string;
+        unread_count: number;
+        pinned: boolean;
+        muted: boolean;
+        updated_at: Date;
+        last_message_id: string | null;
+      }>(
+        `
+          SELECT
+            c.id,
+            string_agg(DISTINCT cm.user_id::text, ',') as participant_ids,
+            cm_user.unread_count,
+            cm_user.pinned,
+            cm_user.muted,
+            c.updated_at,
+            c.last_message_id
+          FROM conversations c
+          INNER JOIN conversation_members cm
+            ON cm.conversation_id = c.id
+          INNER JOIN conversation_members cm_user
+            ON cm_user.conversation_id = c.id AND cm_user.user_id = $1::uuid
+          GROUP BY c.id, c.updated_at, c.last_message_id, cm_user.unread_count, cm_user.pinned, cm_user.muted
+          ORDER BY COALESCE(c.updated_at, c.created_at) DESC
+        `,
+        [userId],
+      );
 
-    return result.rows.map((row) => ({
-      id: row.id,
-      type: row.type,
-      name: row.name,
-      avatar: row.avatar,
-      createdBy: row.created_by,
-      createdAt: row.created_at.toISOString(),
-      updatedAt: row.updated_at?.toISOString(),
-    }));
+      // For each conversation, fetch the last message from MongoDB if available
+      const conversations: ConversationListItemDTO[] = [];
+      for (const row of result.rows) {
+        const participantIds = row.participant_ids ? row.participant_ids.split(',').map(id => id.trim()) : [];
+
+        let lastMessage: MessageDTO | undefined;
+        if (row.last_message_id) {
+          try {
+            lastMessage = await this.getLastMessage(row.last_message_id);
+          } catch (error) {
+            console.error('Failed to fetch last message:', error);
+            // Continue without last message
+          }
+        }
+
+        conversations.push({
+          id: row.id,
+          participantIds,
+          lastMessage,
+          unreadCount: row.unread_count || 0,
+          pinned: row.pinned || false,
+          muted: row.muted || false,
+          updatedAt: row.updated_at.toISOString(),
+        });
+      }
+
+      return conversations;
+    } catch (error) {
+      console.error('Error fetching user conversations:', error);
+      throw error;
+    }
+  }
+
+  private async getLastMessage(messageId: string): Promise<MessageDTO | undefined> {
+    // This will be implemented to fetch from MongoDB
+    // For now, returning undefined
+    return undefined;
   }
 
   async joinConversation(
