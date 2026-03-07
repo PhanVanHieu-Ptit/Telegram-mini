@@ -2,7 +2,9 @@ export interface User {
   id: string;
   username: string;
   email: string;
-  passwordHash: string;
+  passwordHash?: string;
+  googleId?: string;
+  displayName?: string;
   avatar?: string;
   status: string;
   createdAt: Date;

@@ -60,7 +60,7 @@ export class AuthService {
     const { email, password } = params;
 
     const user = await this.userRepository.findUserByEmail(email);
-    if (!user) {
+    if (!user || !user.passwordHash) {
       throw new Error('Invalid credentials');
     }
 

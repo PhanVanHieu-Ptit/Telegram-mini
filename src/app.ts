@@ -7,6 +7,7 @@ import { setupSocketIOServer } from "./socket";
 import { connectMongo, pgPool } from "./core/db";
 import dotenv from "dotenv";
 import { swaggerPlugin } from "./plugins/swagger";
+import { cookiePlugin } from "./plugins/cookie";
 dotenv.config();
 
 
@@ -30,6 +31,9 @@ export async function buildApp(options: FastifyServerOptions = {}): Promise<Fast
 
 	// Register Swagger plugin before routes
 	await app.register(swaggerPlugin);
+
+	// Register cookies
+	await app.register(cookiePlugin);
 
 	// Register plugins (other than swagger)
 	app.register(autoLoad, {
