@@ -30,6 +30,7 @@ async function dropAndRecreate() {
         email VARCHAR(255) NOT NULL UNIQUE,
         password_hash VARCHAR(255),
         google_id VARCHAR(255) UNIQUE,
+        facebook_id VARCHAR(255) UNIQUE,
         display_name VARCHAR(255),
         avatar VARCHAR(255),
         status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'banned')),

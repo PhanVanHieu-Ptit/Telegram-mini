@@ -4,6 +4,7 @@ export interface User {
   email: string;
   passwordHash?: string;
   googleId?: string;
+  facebookId?: string;
   displayName?: string;
   avatar?: string;
   status: string;

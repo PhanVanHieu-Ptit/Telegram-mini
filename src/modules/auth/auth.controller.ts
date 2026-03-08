@@ -148,6 +148,23 @@ export class AuthController {
       void reply.code(500).send({ error: 'Internal server error' });
     }
   }
+
+  async logout(
+    _request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<void> {
+    try {
+      void reply.clearCookie('accessToken', {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+      });
+      void reply.code(200).send({ message: 'Logged out successfully' });
+    } catch (error) {
+      void reply.code(500).send({ error: 'Internal server error' });
+    }
+  }
 }
 
 
