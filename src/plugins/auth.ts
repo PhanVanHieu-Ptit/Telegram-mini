@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 import jwt from "jsonwebtoken";
+import "@fastify/cookie";
 
 declare module "fastify" {
     interface FastifyInstance {
@@ -11,21 +12,28 @@ declare module "fastify" {
 const authPlugin: FastifyPluginAsync = async (fastify) => {
     fastify.decorate("authenticate", async (request: FastifyRequest, reply: FastifyReply) => {
         const secret = process.env.JWT_SECRET || "your-secret-key";
-        const authHeader = request.headers.authorization;
+        let token: string | undefined;
 
-        if (!authHeader?.startsWith("Bearer ")) {
-            void reply.code(401).send({ error: "Unauthorized" });
-            return;
+        // 1. Try to get token from Authorization header
+        const authHeader = request.headers.authorization;
+        if (authHeader?.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
         }
 
-        const token = authHeader.substring(7);
+        // 2. If no header, try to get from cookie
+        if (!token && request.cookies) {
+            token = request.cookies.accessToken;
+        }
+
+        if (!token) {
+            return reply.code(401).send({ error: "Unauthorized: No token provided" });
+        }
 
         try {
             const decoded = jwt.verify(token, secret) as any;
             (request as any).user = decoded;
         } catch (err) {
-            void reply.code(401).send({ error: "Unauthorized" });
-            return;
+            return reply.code(401).send({ error: "Unauthorized: Invalid token" });
         }
     });
 };

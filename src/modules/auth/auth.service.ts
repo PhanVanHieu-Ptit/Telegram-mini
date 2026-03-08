@@ -89,6 +89,13 @@ export class AuthService {
     const { passwordHash: _, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }
+
+  async findUserById(userId: string): Promise<Omit<User, 'passwordHash'> | null> {
+    const user = await this.userRepository.findUserById(userId);
+    if (!user) return null;
+    const { passwordHash: _, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  }
 }
 
 

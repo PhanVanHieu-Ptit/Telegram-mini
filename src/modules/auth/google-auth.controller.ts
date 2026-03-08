@@ -1,4 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import "@fastify/cookie";
 import { googleAuthService } from './google-auth.service';
 import { postgresUserRepository } from './postgres-user.repository';
 import jwt from 'jsonwebtoken';
@@ -64,7 +65,7 @@ export class GoogleAuthController {
       );
 
       // 5. Set HttpOnly Cookie
-      void reply.setCookie('token', token, {
+      void reply.setCookie('accessToken', token, {
         path: '/',
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',

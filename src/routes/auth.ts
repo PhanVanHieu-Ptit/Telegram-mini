@@ -102,28 +102,7 @@ const routes: FastifyPluginAsync = async (fastify) => {
                     500: ErrorResponse,
                 },
             },
-            preHandler: async (request, reply) => {
-                const secret = process.env.JWT_SECRET || 'your-secret-key';
-                const authHeader = request.headers.authorization;
-                if (!authHeader?.startsWith('Bearer ')) {
-                    void reply.code(401).send({ error: 'Unauthorized' });
-                    return;
-                }
-                const token = authHeader.substring(7);
-                try {
-                    const decoded = (await new Promise((resolve, reject) => {
-                        import('jsonwebtoken').then(jwt => {
-                            jwt.verify(token, secret, (err, decoded) => {
-                                if (err) reject(err);
-                                else resolve(decoded);
-                            });
-                        });
-                    })) as any;
-                    (request as any).user = decoded;
-                } catch {
-                    void reply.code(401).send({ error: 'Unauthorized' });
-                }
-            },
+            preHandler: fastify.authenticate,
         },
         (request, reply) => authController.updateAvatar(request, reply),
     );
@@ -147,30 +126,27 @@ const routes: FastifyPluginAsync = async (fastify) => {
                     500: ErrorResponse,
                 },
             },
-            preHandler: async (request, reply) => {
-                const secret = process.env.JWT_SECRET || 'your-secret-key';
-                const authHeader = request.headers.authorization;
-                if (!authHeader?.startsWith('Bearer ')) {
-                    void reply.code(401).send({ error: 'Unauthorized' });
-                    return;
-                }
-                const token = authHeader.substring(7);
-                try {
-                    const decoded = (await new Promise((resolve, reject) => {
-                        import('jsonwebtoken').then(jwt => {
-                            jwt.verify(token, secret, (err, decoded) => {
-                                if (err) reject(err);
-                                else resolve(decoded);
-                            });
-                        });
-                    })) as any;
-                    (request as any).user = decoded;
-                } catch {
-                    void reply.code(401).send({ error: 'Unauthorized' });
-                }
-            },
+            preHandler: fastify.authenticate,
         },
         (request, reply) => authController.updateStatus(request, reply),
+    );
+
+    fastify.get(
+        '/me',
+        {
+            schema: {
+                summary: 'Get current user information',
+                tags: ['auth'],
+                response: {
+                    200: AuthUser,
+                    401: ErrorResponse,
+                    404: ErrorResponse,
+                    500: ErrorResponse,
+                },
+            },
+            preHandler: fastify.authenticate,
+        },
+        (request, reply) => authController.me(request, reply),
     );
 };
 
