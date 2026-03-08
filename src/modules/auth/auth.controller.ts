@@ -1,4 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import "@fastify/cookie";
 import type { AuthService } from './auth.service';
 import { authService } from './auth.service';
 import { LoginParams, RegisterParams } from './auth.types';
@@ -29,6 +30,16 @@ export class AuthController {
 
 
             const result = await this.service.register({ username, email, password });
+            
+            // Set cookie for token
+            void reply.setCookie('accessToken', result.token, {
+                path: '/',
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 7 * 24 * 60 * 60, // 7 days
+            });
+
             void reply.code(200).send(result);
         } catch (error) {
             if (error instanceof Error && error.message === 'User already exists') {
@@ -54,6 +65,16 @@ export class AuthController {
             }
 
             const result = await this.service.login({ email, password });
+
+            // Set cookie for token
+            void reply.setCookie('accessToken', result.token, {
+                path: '/',
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax',
+                maxAge: 7 * 24 * 60 * 60, // 7 days
+            });
+
             void reply.send(result);
         } catch (error) {
             if (error instanceof Error && error.message === 'Invalid credentials') {
@@ -84,25 +105,49 @@ export class AuthController {
         }
     }
 
-    async updateStatus(
-        request: FastifyRequest<{ Body: { status: string } }>,
-        reply: FastifyReply,
-    ): Promise<void> {
-        try {
-            const userId = (request as any).user?.userId;
-            const { status } = request.body;
+  async updateStatus(
+    request: FastifyRequest<{ Body: { status: string } }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    try {
+      const userId = (request as any).user?.userId;
+      const { status } = request.body;
 
-            if (!userId) {
-                void reply.code(401).send({ error: 'Unauthorized' });
-                return;
-            }
+      if (!userId) {
+        void reply.code(401).send({ error: 'Unauthorized' });
+        return;
+      }
 
-            const user = await this.service.updateStatus(userId, status);
-            void reply.send(user);
-        } catch (error) {
-            void reply.code(500).send({ error: 'Internal server error' });
-        }
+      const user = await this.service.updateStatus(userId, status);
+      void reply.send(user);
+    } catch (error) {
+      void reply.code(500).send({ error: 'Internal server error' });
     }
+  }
+
+  async me(
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<void> {
+    try {
+      const userId = (request as any).user?.userId;
+
+      if (!userId) {
+        void reply.code(401).send({ error: 'Unauthorized' });
+        return;
+      }
+
+      const user = await this.service.findUserById(userId);
+      if (!user) {
+        void reply.code(404).send({ error: 'User not found' });
+        return;
+      }
+
+      void reply.send(user);
+    } catch (error) {
+      void reply.code(500).send({ error: 'Internal server error' });
+    }
+  }
 }
 
 

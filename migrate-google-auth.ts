@@ -1,6 +1,6 @@
-import { pgPool } from './src/core/db';
 import dotenv from 'dotenv';
 dotenv.config();
+import { pgPool } from './src/core/db';
 
 async function migrate() {
   const queries = [
