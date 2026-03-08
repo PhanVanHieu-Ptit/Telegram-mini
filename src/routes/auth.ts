@@ -47,107 +47,120 @@ const ErrorResponse = {
 };
 
 const routes: FastifyPluginAsync = async (fastify) => {
-    fastify.post<{ Body: RegisterBody }>(
-        '/register',
-        {
-            schema: {
-                summary: 'Register a new user',
-                tags: ['auth'],
-                body: AuthRegisterBody,
-                response: {
-                    200: AuthResponse,
-                    400: ErrorResponse,
-                    409: ErrorResponse,
-                    500: ErrorResponse,
-                },
-            },
-        },
-        (request, reply) => authController.register(request, reply),
-    );
-
-    fastify.post<{ Body: LoginBody }>(
-        '/login',
-        {
-            schema: {
-                summary: 'Login user',
-                tags: ['auth'],
-                body: AuthLoginBody,
-                response: {
-                    200: AuthResponse,
-                    400: ErrorResponse,
-                    401: ErrorResponse,
-                    500: ErrorResponse,
-                },
-            },
-        },
-        (request, reply) => authController.login(request, reply),
-    );
-
-    fastify.patch<{ Body: { avatar: string } }>(
-        '/update-avatar',
-        {
-            schema: {
-                summary: 'Update user avatar',
-                tags: ['auth'],
-                body: {
-                    type: 'object',
-                    required: ['avatar'],
-                    properties: {
-                        avatar: { type: 'string' },
+    fastify.register(async (auth) => {
+        auth.post<{ Body: RegisterBody }>(
+            '/register',
+            {
+                schema: {
+                    summary: 'Register a new user',
+                    tags: ['auth'],
+                    body: AuthRegisterBody,
+                    response: {
+                        200: AuthResponse,
+                        400: ErrorResponse,
+                        409: ErrorResponse,
+                        500: ErrorResponse,
                     },
                 },
-                response: {
-                    200: AuthUser,
-                    401: ErrorResponse,
-                    500: ErrorResponse,
-                },
             },
-            preHandler: fastify.authenticate,
-        },
-        (request, reply) => authController.updateAvatar(request, reply),
-    );
+            (request, reply) => authController.register(request, reply),
+        );
 
-    fastify.patch<{ Body: { status: string } }>(
-        '/update-status',
-        {
-            schema: {
-                summary: 'Update user status',
-                tags: ['auth'],
-                body: {
-                    type: 'object',
-                    required: ['status'],
-                    properties: {
-                        status: { type: 'string' },
+        auth.post<{ Body: LoginBody }>(
+            '/login',
+            {
+                schema: {
+                    summary: 'Login user',
+                    tags: ['auth'],
+                    body: AuthLoginBody,
+                    response: {
+                        200: AuthResponse,
+                        400: ErrorResponse,
+                        401: ErrorResponse,
+                        500: ErrorResponse,
                     },
                 },
-                response: {
-                    200: AuthUser,
-                    401: ErrorResponse,
-                    500: ErrorResponse,
-                },
             },
-            preHandler: fastify.authenticate,
-        },
-        (request, reply) => authController.updateStatus(request, reply),
-    );
+            (request, reply) => authController.login(request, reply),
+        );
 
-    fastify.get(
-        '/me',
-        {
-            schema: {
-                summary: 'Get current user information',
-                tags: ['auth'],
-                response: {
-                    200: AuthUser,
-                    401: ErrorResponse,
-                    404: ErrorResponse,
-                    500: ErrorResponse,
+        auth.patch<{ Body: { avatar: string } }>(
+            '/update-avatar',
+            {
+                schema: {
+                    summary: 'Update user avatar',
+                    tags: ['auth'],
+                    body: {
+                        type: 'object',
+                        required: ['avatar'],
+                        properties: {
+                            avatar: { type: 'string' },
+                        },
+                    },
+                    response: {
+                        200: AuthUser,
+                        401: ErrorResponse,
+                        500: ErrorResponse,
+                    },
+                },
+                preHandler: fastify.authenticate,
+            },
+            (request, reply) => authController.updateAvatar(request, reply),
+        );
+
+        auth.patch<{ Body: { status: string } }>(
+            '/update-status',
+            {
+                schema: {
+                    summary: 'Update user status',
+                    tags: ['auth'],
+                    body: {
+                        type: 'object',
+                        required: ['status'],
+                        properties: {
+                            status: { type: 'string' },
+                        },
+                    },
+                    response: {
+                        200: AuthUser,
+                        401: ErrorResponse,
+                        500: ErrorResponse,
+                    },
+                },
+                preHandler: fastify.authenticate,
+            },
+            (request, reply) => authController.updateStatus(request, reply),
+        );
+
+        auth.get(
+            '/me',
+            {
+                schema: {
+                    summary: 'Get current user information',
+                    tags: ['auth'],
+                    response: {
+                        200: AuthUser,
+                        401: ErrorResponse,
+                        404: ErrorResponse,
+                        500: ErrorResponse,
+                    },
+                },
+                preHandler: fastify.authenticate,
+            },
+            (request, reply) => authController.me(request, reply),
+        );
+
+        auth.post(
+            '/logout',
+            {
+                schema: {
+                    summary: 'Logout user',
+                    tags: ['auth'],
                 },
             },
-            preHandler: fastify.authenticate,
-        },
-        (request, reply) => authController.me(request, reply),
-    );
+            (request, reply) => authController.logout(request, reply),
+        );
+    }, { prefix: '/auth' });
 };
 
 
