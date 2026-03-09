@@ -133,19 +133,28 @@ export class AuthController {
       const userId = (request as any).user?.userId;
 
       if (!userId) {
-        void reply.code(401).send({ error: 'Unauthorized' });
+        void reply.code(401).send({ error: 'Unauthorized: Missing or invalid token' });
         return;
       }
 
       const user = await this.service.findUserById(userId);
       if (!user) {
-        void reply.code(404).send({ error: 'User not found' });
+        void reply.code(404).send({ error: 'User not found in database' });
         return;
       }
 
-      void reply.send(user);
+      // Map the user to match the strict AuthUser schema
+      const responseUser = {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        createdAt: user.createdAt.toISOString(),
+        updatedAt: user.updatedAt.toISOString(),
+      };
+
+      void reply.code(200).send(responseUser);
     } catch (error) {
-      void reply.code(500).send({ error: 'Internal server error' });
+      void reply.code(500).send({ error: 'Internal server error while fetching user profile' });
     }
   }
 
