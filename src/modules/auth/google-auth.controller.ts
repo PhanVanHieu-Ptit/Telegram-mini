@@ -37,15 +37,20 @@ export class GoogleAuthController {
       // 3. Find or create user in DB
       let user = await postgresUserRepository.findUserByGoogleId(profile.id);
 
-      if (!user) {
+      if (user) {
+        request.log.info({ userId: user.id }, 'User found by Google ID');
+      } else {
+        request.log.info({ googleId: profile.id }, 'User not found by Google ID, checking email');
+        
         // Double check by email if user existed before with same email
         user = await postgresUserRepository.findUserByEmail(profile.email);
 
         if (user) {
+          request.log.info({ userId: user.id, email: user.email }, 'User found by email, linking Google ID');
           // Update existing user with google_id
-          // (Simplified: in real app you might want to handle this more securely)
-          // For now, let's just use the existing user
+          user = await postgresUserRepository.linkGoogleId(user.id, profile.id);
         } else {
+          request.log.info({ email: profile.email }, 'User not found by email, creating new Google user');
           // Create new user
           user = await postgresUserRepository.createGoogleUser({
             username: profile.email.split('@')[0], // Simple username from email

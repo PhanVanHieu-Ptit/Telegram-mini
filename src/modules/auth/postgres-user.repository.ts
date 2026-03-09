@@ -122,6 +122,28 @@ export class PostgresUserRepository {
     return result.rows[0];
   }
 
+  async linkGoogleId(userId: string, googleId: string): Promise<User> {
+    const query = `
+      UPDATE users
+      SET google_id = $1, updated_at = NOW()
+      WHERE id = $2
+      RETURNING id, username, email, password_hash as "passwordHash", google_id as "googleId", facebook_id as "facebookId", display_name as "displayName", avatar, status, created_at as "createdAt", updated_at as "updatedAt"
+    `;
+    const result = await this.pool.query(query, [googleId, userId]);
+    return result.rows[0];
+  }
+
+  async linkFacebookId(userId: string, facebookId: string): Promise<User> {
+    const query = `
+      UPDATE users
+      SET facebook_id = $1, updated_at = NOW()
+      WHERE id = $2
+      RETURNING id, username, email, password_hash as "passwordHash", google_id as "googleId", facebook_id as "facebookId", display_name as "displayName", avatar, status, created_at as "createdAt", updated_at as "updatedAt"
+    `;
+    const result = await this.pool.query(query, [facebookId, userId]);
+    return result.rows[0];
+  }
+
   async deleteUser(userId: string): Promise<void> {
     const query = 'DELETE FROM users WHERE id = $1';
     await this.pool.query(query, [userId]);

@@ -37,16 +37,22 @@ export class FacebookAuthController {
       // 3. Find or create user in DB
       let user = await postgresUserRepository.findUserByFacebookId(profile.id);
 
-      if (!user) {
+      if (user) {
+        request.log.info({ userId: user.id }, 'User found by Facebook ID');
+      } else {
+        request.log.info({ facebookId: profile.id }, 'User not found by Facebook ID, checking email');
+        
         // If no facebook_id, check by email
         if (profile.email) {
           user = await postgresUserRepository.findUserByEmail(profile.email);
         }
 
         if (user) {
-          // In a real app, you might want to link the accounts here
-          // For now, let's just use the existing user
+          request.log.info({ userId: user.id, email: user.email }, 'User found by email, linking Facebook ID');
+          // Link the account
+          user = await postgresUserRepository.linkFacebookId(user.id, profile.id);
         } else {
+          request.log.info({ email: profile.email }, 'User not found by email, creating new Facebook user');
           // Create new user
           const email = profile.email || `${profile.id}@facebook.com`;
           user = await postgresUserRepository.createFacebookUser({
