@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { messageController } from "../modules/message/message.controller";
+import { messageSummarizeController } from "../modules/message/message-summarize.controller";
 
 const MessageRequestBody = {
   type: 'object',
@@ -297,6 +298,50 @@ const routes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       await messageController.markAsSeen(request as any, reply);
+    },
+  );
+
+  // Summarize messages using local LLM
+  fastify.post(
+    '/messages/summarize',
+    {
+      schema: {
+        summary: 'Summarize chat messages using local LLM',
+        tags: ['messages'],
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['messages'],
+          properties: {
+            messages: { type: 'string' },
+            senderFilter: { type: 'string', nullable: true },
+            startTime: { type: 'string', nullable: true },
+            endTime: { type: 'string', nullable: true },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              summary: { type: 'array', items: { type: 'string' } },
+            },
+          },
+          400: ErrorResponse,
+          401: ErrorResponse,
+          500: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              message: { type: 'string' },
+            },
+          },
+        },
+      },
+      preHandler: fastify.authenticate,
+    },
+    async (request, reply) => {
+      await messageSummarizeController.summarize(request as any, reply);
     },
   );
 };
