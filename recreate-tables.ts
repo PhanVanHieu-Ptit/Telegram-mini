@@ -33,6 +33,9 @@ async function dropAndRecreate() {
         facebook_id VARCHAR(255) UNIQUE,
         display_name TEXT,
         avatar TEXT,
+        avatar_url TEXT,
+        online BOOLEAN DEFAULT FALSE,
+        last_seen_at TIMESTAMP,
         status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'banned')),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
