@@ -202,6 +202,7 @@ export class PostgresConversationRepository implements IConversationRepository {
         pinned: boolean;
         muted: boolean;
         updated_at: Date;
+        name: string
         last_message_id: string | null;
       }>(
         `
@@ -221,6 +222,7 @@ export class PostgresConversationRepository implements IConversationRepository {
             cm_user.pinned,
             cm_user.muted,
             c.updated_at,
+            c.name,
             c.last_message_id
           FROM conversations c
           INNER JOIN conversation_members cm
@@ -274,6 +276,7 @@ export class PostgresConversationRepository implements IConversationRepository {
           pinned: row.pinned || false,
           muted: row.muted || false,
           updatedAt: row.updated_at.toISOString(),
+          chatName: row.name || ''
         });
       }
 

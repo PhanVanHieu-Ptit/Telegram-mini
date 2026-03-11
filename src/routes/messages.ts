@@ -73,6 +73,7 @@ const ConversationResponse = {
     unreadCount: { type: "number" },
     pinned: { type: "boolean" },
     muted: { type: "boolean" },
+    chatName: { type: "string" },
     updatedAt: { type: "string", format: "date-time" },
   },
 };
