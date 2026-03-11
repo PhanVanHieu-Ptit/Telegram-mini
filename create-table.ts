@@ -27,6 +27,10 @@ async function createUsersTable() {
       email VARCHAR(255) NOT NULL UNIQUE,
       password_hash VARCHAR(255) NOT NULL,
       avatar VARCHAR(255),
+      display_name VARCHAR(255),
+      avatar_url VARCHAR(255),
+      online BOOLEAN DEFAULT FALSE,
+      last_seen_at TIMESTAMP,
       status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'banned')),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
