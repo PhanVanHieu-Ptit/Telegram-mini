@@ -55,6 +55,7 @@ export interface ConversationListItemDTO {
   unreadCount: number;
   pinned: boolean;
   muted: boolean;
+  chatName: string;
   updatedAt: string;
 }
 
