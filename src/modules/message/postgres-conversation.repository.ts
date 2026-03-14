@@ -308,5 +308,18 @@ export class PostgresConversationRepository implements IConversationRepository {
 
     await this.updateConversationTimestamp(conversationId);
   }
+
+  async getMemberIds(conversationId: string): Promise<string[]> {
+    const result = await pgPool.query<{ user_id: string }>(
+      `
+        SELECT user_id
+        FROM conversation_members
+        WHERE conversation_id = $1
+      `,
+      [conversationId],
+    );
+
+    return result.rows.map((row) => row.user_id);
+  }
 }
 

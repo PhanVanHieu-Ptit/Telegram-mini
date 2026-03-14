@@ -6,12 +6,16 @@ import type { SendMessageInput, MessageDTO, CreateConversationInput } from "./me
 import type { MqttService } from "../mqtt/mqtt.service";
 import { ValidationError, UnauthorizedError } from "../../core/errors/AppError";
 import { MqttTopics } from "../mqtt/mqtt.topics";
+import type { NotificationService } from "../notifications/notification.service";
+import type { UserService } from "../user/user.service";
 
 export class MessageService {
   constructor(
     private readonly messageRepository: IMessageRepository,
     private readonly conversationRepository: IConversationRepository,
     private readonly mqttService: MqttService,
+    private readonly notificationService: NotificationService,
+    private readonly userService: UserService,
   ) { }
 
   async sendMessage(input: SendMessageInput): Promise<MessageDTO> {
@@ -42,6 +46,33 @@ export class MessageService {
         timestamp: new Date().toISOString(),
       },
     );
+
+    // Send Push Notification
+    try {
+      const [sender, memberIds] = await Promise.all([
+        this.userService.getUserById(input.senderId),
+        this.conversationRepository.getMemberIds(input.conversationId),
+      ]);
+
+      const recipientIds = memberIds.filter((id) => id !== input.senderId);
+
+      if (recipientIds.length > 0) {
+        await this.notificationService.sendToMultipleUsers({
+          userIds: recipientIds,
+          title: sender?.displayName || "New Message",
+          body: input.content,
+          data: {
+            conversationId: input.conversationId,
+            senderId: input.senderId,
+            messageId: message.id || "",
+            type: "chat_message",
+          },
+        });
+      }
+    } catch (pushError) {
+      console.error("Failed to send push notification:", pushError);
+      // Don't throw, we want the message to be sent even if push fails
+    }
 
     return message;
   }

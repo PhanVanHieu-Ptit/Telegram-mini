@@ -8,6 +8,7 @@ import { connectMongo, pgPool } from "./core/db";
 import dotenv from "dotenv";
 import { swaggerPlugin } from "./plugins/swagger";
 import { cookiePlugin } from "./plugins/cookie";
+import "./core/firebase";
 dotenv.config();
 
 

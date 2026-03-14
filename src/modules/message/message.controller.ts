@@ -197,13 +197,23 @@ export class MessageController {
 
 import { PostgresConversationRepository } from "./postgres-conversation.repository";
 import { MongoMessageRepository, MessageModel } from "./mongo-message.repository";
-// You need to provide a valid Mongoose model for MongoMessageRepository
-import mongoose from "mongoose";
-import type { MessageDocument } from "./mongo-message.repository";
+import { TokenService } from "../notifications/token.service";
+import { NotificationService } from "../notifications/notification.service";
+import { userService } from "../user/user.service";
 
-// Example: Replace 'YourMongooseModel' with your actual model
 const messageRepository = new MongoMessageRepository(MessageModel);
 const conversationRepository = new PostgresConversationRepository();
 const mqttService = new MqttService();
-export const messageController = new MessageController(new MessageService(messageRepository, conversationRepository, mqttService));
+const tokenService = new TokenService();
+const notificationService = new NotificationService(tokenService);
+
+export const messageController = new MessageController(
+  new MessageService(
+    messageRepository,
+    conversationRepository,
+    mqttService,
+    notificationService,
+    userService
+  )
+);
 
