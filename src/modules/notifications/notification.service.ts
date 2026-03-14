@@ -1,0 +1,74 @@
+import { messaging } from "../../core/firebase";
+import { TokenService } from "./token.service";
+import { SendNotificationPayload, SendNotificationToMultipleUsersPayload } from "./notification.types";
+
+export class NotificationService {
+  constructor(private tokenService: TokenService) {}
+
+  async sendToUser(payload: SendNotificationPayload): Promise<{ success: number; failure: number }> {
+    const { userId, title, body, data } = payload;
+    const tokens = await this.tokenService.getTokensByUserId(userId);
+
+    if (tokens.length === 0 || !messaging) {
+      return { success: 0, failure: 0 };
+    }
+
+    return this.sendToTokens(tokens, title, body, data);
+  }
+
+  async sendToMultipleUsers(payload: SendNotificationToMultipleUsersPayload): Promise<{ success: number; failure: number }> {
+    const { userIds, title, body, data } = payload;
+    
+    // Get all tokens for all users
+    const allTokensPromises = userIds.map(userId => this.tokenService.getTokensByUserId(userId));
+    const tokenArrays = await Promise.all(allTokensPromises);
+    const tokens = tokenArrays.flat();
+
+    if (tokens.length === 0 || !messaging) {
+      return { success: 0, failure: 0 };
+    }
+
+    return this.sendToTokens(tokens, title, body, data);
+  }
+
+  private async sendToTokens(tokens: string[], title: string, body: string, data?: Record<string, string>): Promise<{ success: number; failure: number }> {
+    if (!messaging) return { success: 0, failure: 0 };
+
+    const message: any = {
+      tokens,
+      notification: {
+        title,
+        body,
+      },
+      data: data || {},
+    };
+
+    try {
+      const response = await messaging.sendEachForMulticast(message);
+      
+      const invalidTokens: string[] = [];
+      response.responses.forEach((res, index) => {
+        if (!res.success) {
+          const error = res.error;
+          if (error?.code === 'messaging/invalid-registration-token' || 
+              error?.code === 'messaging/registration-token-not-registered') {
+            invalidTokens.push(tokens[index]);
+          }
+        }
+      });
+
+      // Cleanup invalid tokens
+      if (invalidTokens.length > 0) {
+        await Promise.all(invalidTokens.map(token => this.tokenService.removeInvalidToken(token)));
+      }
+
+      return {
+        success: response.successCount,
+        failure: response.failureCount,
+      };
+    } catch (error) {
+      console.error("Error sending FCM notification:", error);
+      throw error;
+    }
+  }
+}

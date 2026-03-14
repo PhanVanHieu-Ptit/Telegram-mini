@@ -47,5 +47,7 @@ export interface IConversationRepository {
     conversationId: string,
     userId: string,
   ): Promise<void>;
+
+  getMemberIds(conversationId: string): Promise<string[]>;
 }
 

@@ -12,6 +12,9 @@ import { MongoMessageRepository, MessageModel } from "./modules/message/mongo-me
 import { PostgresConversationRepository } from "./modules/message/postgres-conversation.repository";
 import { MqttService } from "./modules/mqtt/mqtt.service";
 import { presenceService } from "./modules/mqtt/presence.service";
+import { TokenService } from "./modules/notifications/token.service";
+import { NotificationService } from "./modules/notifications/notification.service";
+import { userService } from "./modules/user/user.service";
 
 export type FastifyInstanceWithIO = FastifyInstance & {
   io?: SocketIOServer;
@@ -24,7 +27,16 @@ export function setupSocketIOServer(
   const messageRepository = new MongoMessageRepository(MessageModel);
   const conversationRepository = new PostgresConversationRepository();
   const mqttService = new MqttService();
-  const messageService = new MessageService(messageRepository, conversationRepository, mqttService);
+  const tokenService = new TokenService();
+  const notificationService = new NotificationService(tokenService);
+
+  const messageService = new MessageService(
+    messageRepository,
+    conversationRepository,
+    mqttService,
+    notificationService,
+    userService
+  );
 
   // Initialize heartbeat system asynchronously
   (async () => {
