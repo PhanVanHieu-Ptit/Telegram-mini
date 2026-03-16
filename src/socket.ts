@@ -197,6 +197,26 @@ export function setupSocketIOServer(
       }
     });
 
+    socket.on("call:join", (roomId: string) => {
+      const userId = socket.data?.userId as string | undefined;
+      if (!userId || !roomId) return;
+      socket.join(roomId);
+      socket.to(roomId).emit("call:user-joined", { userId });
+      fastifyInstance.log.info({ userId, roomId }, "User joined call room");
+    });
+
+    socket.on("webrtc:offer", (payload: { roomId: string; offer: any }) => {
+      socket.to(payload.roomId).emit("webrtc:offer", { offer: payload.offer, userId: socket.data?.userId });
+    });
+
+    socket.on("webrtc:answer", (payload: { roomId: string; answer: any }) => {
+      socket.to(payload.roomId).emit("webrtc:answer", { answer: payload.answer, userId: socket.data?.userId });
+    });
+
+    socket.on("webrtc:ice-candidate", (payload: { roomId: string; candidate: any }) => {
+      socket.to(payload.roomId).emit("webrtc:ice-candidate", { candidate: payload.candidate, userId: socket.data?.userId });
+    });
+
     socket.on("disconnect", (reason: string) => {
       fastifyInstance.log.info(
         { socketId: socket.id, reason },
