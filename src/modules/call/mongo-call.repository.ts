@@ -45,10 +45,34 @@ export class MongoCallRepository {
     return this.mapToEntity(call);
   }
 
-  async updateCallStatusAndDuration(callId: string, status: string, endTime: Date, duration: number): Promise<CallEntity | null> {
+  /**
+   * Update status, startTime (when call becomes active), and duration.
+   * Used for both 'ongoing' (accept) and 'ended' statuses.
+   */
+  async updateCallStatusAndDuration(
+    callId: string,
+    status: string,
+    startOrEndTime: Date,
+    duration: number
+  ): Promise<CallEntity | null> {
+    const updatePayload: Record<string, unknown> = { status, duration };
+
+    if (status === 'ongoing') {
+      updatePayload['startTime'] = startOrEndTime;
+    } else if (status === 'ended') {
+      updatePayload['endTime'] = startOrEndTime;
+    }
+
+    const call = await CallModel.findByIdAndUpdate(callId, updatePayload, { new: true });
+    if (!call) return null;
+    return this.mapToEntity(call);
+  }
+
+  /** Mark a call as rejected. */
+  async updateCallStatusToRejected(callId: string): Promise<CallEntity | null> {
     const call = await CallModel.findByIdAndUpdate(
       callId,
-      { status, endTime, duration },
+      { status: 'rejected' },
       { new: true }
     );
     if (!call) return null;
@@ -57,10 +81,10 @@ export class MongoCallRepository {
 
   async getCallHistory(userId: string): Promise<CallEntity[]> {
     const calls = await CallModel.find({
-      $or: [{ callerId: userId }, { receiverId: userId }]
+      $or: [{ callerId: userId }, { receiverId: userId }],
     }).sort({ createdAt: -1 });
-    
-    return calls.map(c => this.mapToEntity(c));
+
+    return calls.map((c) => this.mapToEntity(c));
   }
 
   private mapToEntity(doc: any): CallEntity {
