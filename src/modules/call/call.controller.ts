@@ -3,9 +3,13 @@ import { CallService } from './call.service';
 import { MongoCallRepository } from './mongo-call.repository';
 import { StartCallInput, EndCallInput } from './call.types';
 import { notifyUser } from './rtcNotifier';
+import { NotificationService } from '../notifications/notification.service';
+import { TokenService } from '../notifications/token.service';
+import { authService } from '../auth/auth.service';
 
 const callRepository = new MongoCallRepository();
 const callService = new CallService(callRepository);
+const notificationService = new NotificationService(new TokenService());
 
 // ---------------------------------------------------------------------------
 // Helper: extract caller userId from the Fastify request
@@ -34,13 +38,35 @@ export const callController = {
         callType: request.body.callType,
       });
 
+      // Look up caller info from DB for display name & avatar
+      const callerUser = await authService.findUserById(userId);
+      const callerName = callerUser?.username ?? (request as any).user?.email ?? userId;
+      const callerAvatar = callerUser?.avatar ?? null;
+
       // Notify callee through rtc-service (non-blocking)
       void notifyUser('incoming-call', request.body.receiverId, {
         callId: callDto.id,
         callerId: userId,
-        callerName: (request as any).user?.username ?? userId,
+        callerName,
+        callerAvatar,
         roomId: callDto.roomName,
         callType: callDto.callType,
+      });
+
+      // FCM push notification for when callee is offline/background (non-blocking)
+      void notificationService.sendToUser({
+        userId: request.body.receiverId,
+        title: `Incoming ${callDto.callType} call`,
+        body: `${callerName} is calling you`,
+        data: {
+          type: 'CALL_INCOMING',
+          callId: callDto.id,
+          callerId: userId,
+          roomId: callDto.roomName,
+          callType: callDto.callType,
+        },
+      }).catch((err: unknown) => {
+        request.log.warn({ err }, 'Failed to send FCM call notification');
       });
 
       return reply.status(201).send(callDto);
