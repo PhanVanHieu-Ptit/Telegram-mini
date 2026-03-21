@@ -81,8 +81,10 @@ export class FacebookAuthController {
         maxAge: 7 * 24 * 60 * 60, // 7 days
       });
 
-      // 6. Redirect back to frontend admin (as requested: ${FRONTEND_URL}/admin)
-      return reply.redirect(`${FRONTEND_URL}/admin`);
+      // 6. Redirect to frontend callback page with token so JS can save it
+      return reply.redirect(
+        `${FRONTEND_URL}/auth/google/callback?token=${encodeURIComponent(token)}`,
+      );
     } catch (error: any) {
       request.log.error(error);
       return reply.redirect(`${FRONTEND_URL}/login?error=auth_failed`);

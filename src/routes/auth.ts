@@ -139,7 +139,13 @@ const routes: FastifyPluginAsync = async (fastify) => {
                     summary: 'Get current user information',
                     tags: ['auth'],
                     response: {
-                        200: AuthUser,
+                        200: {
+                            type: 'object',
+                            properties: {
+                                ...AuthUser.properties,
+                                token: { type: 'string' },
+                            },
+                        },
                         401: ErrorResponse,
                         404: ErrorResponse,
                         500: ErrorResponse,

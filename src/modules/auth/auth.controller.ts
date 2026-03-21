@@ -1,8 +1,11 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import "@fastify/cookie";
+import jwt from 'jsonwebtoken';
 import type { AuthService } from './auth.service';
 import { authService } from './auth.service';
 import { LoginParams, RegisterParams } from './auth.types';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 export interface RegisterBody extends RegisterParams { }
 export interface LoginBody extends LoginParams { }
@@ -152,7 +155,15 @@ export class AuthController {
         updatedAt: user.updatedAt.toISOString(),
       };
 
-      void reply.code(200).send(responseUser);
+      // Return a fresh JWT so cookie-only auth users (OAuth) also get a
+      // token that the frontend can pass to the RTC signaling service.
+      const token = jwt.sign(
+        { userId: user.id, email: user.email },
+        JWT_SECRET,
+        { expiresIn: '7d' },
+      );
+
+      void reply.code(200).send({ ...responseUser, token });
     } catch (error) {
       void reply.code(500).send({ error: 'Internal server error while fetching user profile' });
     }
