@@ -19,6 +19,11 @@ if (!admin.apps.length) {
       });
       console.log("Firebase Admin SDK initialized successfully with environment variables");
     } else {
+      console.error("❌ Missing Firebase Env Vars:", {
+        projectId: !!projectId,
+        clientEmail: !!clientEmail,
+        privateKey: !!privateKey
+      });
       admin.initializeApp({
         credential: admin.credential.applicationDefault(),
       });
