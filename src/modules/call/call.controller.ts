@@ -1,4 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
+import axios from 'axios';
 import { CallService } from './call.service';
 import { MongoCallRepository } from './mongo-call.repository';
 import { StartCallInput, EndCallInput } from './call.types';
@@ -151,6 +152,21 @@ export const callController = {
       return reply.send(history);
     } catch {
       return reply.status(500).send({ error: 'Internal Server Error' });
+    }
+  },
+
+  async getIceServers(_request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const host = process.env.METERED_APP_HOST;
+      const apiKey = process.env.METERED_API_KEY;
+      const response = await axios.get(
+        `https://${host}/api/v1/turn/credentials`,
+        { params: { apiKey } }
+      );
+      return reply.send(response.data);
+    } catch (error: any) {
+      _request.log.error({ err: error }, 'Failed to fetch ICE servers');
+      return reply.send([{ urls: 'stun:stun.l.google.com:19302' }]);
     }
   },
 };

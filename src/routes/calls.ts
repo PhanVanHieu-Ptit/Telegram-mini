@@ -133,6 +133,27 @@ const routes: FastifyPluginAsync = async (fastify) => {
     },
     preHandler: (fastify as any).authenticate,
   }, async (request, reply) => callController.getHistory(request as any, reply));
+
+  // GET /calls/get-ice-servers ─── Fetch TURN/STUN credentials from Metered
+  fastify.get('/calls/get-ice-servers', {
+    schema: {
+      summary: 'Get ICE server credentials (TURN/STUN)',
+      tags: ['calls'],
+      response: {
+        200: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              urls: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] },
+              username: { type: 'string', nullable: true },
+              credential: { type: 'string', nullable: true },
+            },
+          },
+        },
+      },
+    },
+  }, async (request, reply) => callController.getIceServers(request as any, reply));
 };
 
 export default routes;
