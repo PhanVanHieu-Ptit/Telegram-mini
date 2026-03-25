@@ -186,9 +186,10 @@ export const callController = {
       const host = process.env.METERED_APP_HOST;
       const apiKey = process.env.METERED_API_KEY;
       const response = await axios.get(
-        `https://${host}/api/v1/turn/credentials`,
+        `${host}/api/v1/turn/credentials`,
         { params: { apiKey } }
       );
+      console.log('response: ', response)
       return reply.send(response.data);
     } catch (error: any) {
       _request.log.error({ err: error }, 'Failed to fetch ICE servers');
