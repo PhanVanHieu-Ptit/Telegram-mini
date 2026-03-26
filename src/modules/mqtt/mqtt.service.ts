@@ -7,8 +7,15 @@ export class MqttService {
     private readonly subscribedTopics = new Set<string>();
 
     constructor(
-        private readonly brokerUrl: string = process.env.MQTT_BROKER_URL ?? "mqtt://localhost:1883",
-        private readonly options: IClientOptions = {},
+        private readonly brokerUrl: string = process.env.PUBLIC_MQTT_URL ?? "mqtt://localhost:1883",
+        private readonly options: IClientOptions = {
+            clientId: `react_client_${Math.random().toString(16).substring(2, 8)}`,
+            username: process.env.PUBLIC_MQTT_USER,
+            password: process.env.PUBLIC_MQTT_PASS,
+            clean: true,
+            connectTimeout: 30000,
+            reconnectPeriod: 1000,
+        }
     ) { }
 
     async connect(): Promise<void> {
