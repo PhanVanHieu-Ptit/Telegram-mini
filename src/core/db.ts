@@ -49,10 +49,13 @@ export async function connectMongo(): Promise<Db> {
 
 export const pgPool = new Pool({
   host: PG_HOST,
-  port: PG_PORT ? Number(PG_PORT) : undefined,
+  port: PG_PORT ? Number(PG_PORT) : 5432,
   database: PG_DATABASE,
   user: PG_USER,
   password: PG_PASSWORD,
+  ssl: {
+    rejectUnauthorized: !!PG_PORT,
+  },
 });
 
 pgPool.on("error", (err: Error) => {
