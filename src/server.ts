@@ -35,6 +35,21 @@ export async function buildServer(
     dirNameRoutePrefix: false,
   });
 
+  // Centralized API error logging for all failed requests
+  app.addHook("onError", async (request, reply, error) => {
+    request.log.error(
+      {
+        err: error,
+        requestId: request.id,
+        method: request.method,
+        url: request.url,
+        route: request.routeOptions.url,
+        statusCode: reply.statusCode,
+      },
+      "API request failed"
+    );
+  });
+
   // DB connections
   app.decorate("mongo", null as any);
   app.decorate("pgPool", pgPool);

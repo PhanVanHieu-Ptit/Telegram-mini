@@ -45,6 +45,10 @@ export class AuthController {
 
             void reply.code(200).send(result);
         } catch (error) {
+          request.log.error(
+            { err: error, email: request.body?.email, username: request.body?.username },
+            'Auth register failed',
+          );
             if (error instanceof Error && error.message === 'User already exists') {
                 void reply.code(409).send({ error: 'User already exists' });
             } else {
@@ -80,6 +84,10 @@ export class AuthController {
 
             void reply.send(result);
         } catch (error) {
+          request.log.error(
+            { err: error, email: request.body?.email },
+            'Auth login failed',
+          );
             if (error instanceof Error && error.message === 'Invalid credentials') {
                 void reply.code(401).send({ error: 'Invalid credentials' });
             } else {
@@ -104,6 +112,7 @@ export class AuthController {
             const user = await this.service.updateAvatar(userId, avatar);
             void reply.send(user);
         } catch (error) {
+          request.log.error({ err: error }, 'Update avatar failed');
             void reply.code(500).send({ error: 'Internal server error' });
         }
     }
@@ -124,6 +133,7 @@ export class AuthController {
       const user = await this.service.updateStatus(userId, status);
       void reply.send(user);
     } catch (error) {
+      request.log.error({ err: error }, 'Update status failed');
       void reply.code(500).send({ error: 'Internal server error' });
     }
   }
@@ -165,6 +175,7 @@ export class AuthController {
 
       void reply.code(200).send({ ...responseUser, token });
     } catch (error) {
+      request.log.error({ err: error }, 'Get profile failed');
       void reply.code(500).send({ error: 'Internal server error while fetching user profile' });
     }
   }
@@ -182,6 +193,7 @@ export class AuthController {
       });
       void reply.code(200).send({ message: 'Logged out successfully' });
     } catch (error) {
+      reply.log.error({ err: error }, 'Logout failed');
       void reply.code(500).send({ error: 'Internal server error' });
     }
   }
