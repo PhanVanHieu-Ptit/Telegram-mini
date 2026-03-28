@@ -48,18 +48,29 @@ export async function connectMongo(): Promise<Db> {
 }
 
 export const pgPool = new Pool({
+  // Render/managed PostgreSQL usually requires SSL in production.
+  // Local development stays non-SSL unless PG_SSL=true is explicitly set.
+  // You can override with: PG_SSL=false or PG_SSL_REJECT_UNAUTHORIZED=true.
+  ...(function getPgSslConfig() {
+    const shouldUseSsl =
+      process.env.PG_SSL === "true" ||
+      (process.env.NODE_ENV === "production" && process.env.PG_SSL !== "false");
+
+    if (!shouldUseSsl) {
+      return { ssl: undefined };
+    }
+
+    return {
+      ssl: {
+        rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED === "true",
+      },
+    };
+  })(),
   host: PG_HOST,
   port: PG_PORT ? Number(PG_PORT) : 5432,
   database: PG_DATABASE,
   user: PG_USER,
   password: PG_PASSWORD,
-  // Enable SSL only when explicitly requested by environment.
-  ssl:
-    process.env.PG_SSL === "true"
-      ? {
-        rejectUnauthorized: true,
-      }
-      : undefined,
 });
 
 pgPool.on("error", (err: Error) => {
