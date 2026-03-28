@@ -53,9 +53,13 @@ export const pgPool = new Pool({
   database: PG_DATABASE,
   user: PG_USER,
   password: PG_PASSWORD,
-  ssl: {
-    rejectUnauthorized: !!PG_PORT,
-  },
+  // Enable SSL only when explicitly requested by environment.
+  ssl:
+    process.env.PG_SSL === "true"
+      ? {
+        rejectUnauthorized: false,
+      }
+      : undefined,
 });
 
 pgPool.on("error", (err: Error) => {
