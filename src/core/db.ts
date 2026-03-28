@@ -57,7 +57,7 @@ export const pgPool = new Pool({
   ssl:
     process.env.PG_SSL === "true"
       ? {
-        rejectUnauthorized: false,
+        rejectUnauthorized: true,
       }
       : undefined,
 });
