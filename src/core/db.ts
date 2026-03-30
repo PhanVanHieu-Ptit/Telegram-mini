@@ -52,25 +52,33 @@ export const pgPool = new Pool({
   // Local development stays non-SSL unless PG_SSL=true is explicitly set.
   // You can override with: PG_SSL=false or PG_SSL_REJECT_UNAUTHORIZED=true.
   ...(function getPgSslConfig() {
+    const explicitDisableSsl = process.env.PG_SSL === "false";
+    const explicitEnableSsl = process.env.PG_SSL === "true";
+    const isRender = process.env.RENDER === "true";
+    const isProduction = process.env.NODE_ENV === "production";
+    const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(PG_HOST ?? "");
     const shouldUseSsl =
-      process.env.PG_SSL === "true" ||
-      (process.env.NODE_ENV === "production" && process.env.PG_SSL !== "false");
+      explicitEnableSsl ||
+      (!explicitDisableSsl && (isRender || isProduction || !isLocalHost));
 
     if (!shouldUseSsl) {
-      return { ssl: undefined };
+      return {};
     }
 
     return {
-      ssl: {
-        rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED === "true",
-      },
+      ssl: process.env.PG_SSL_REJECT_UNAUTHORIZED === "false"
+        ? { rejectUnauthorized: false }
+        : true,
     };
   })(),
-  host: PG_HOST,
-  port: PG_PORT ? Number(PG_PORT) : 5432,
-  database: PG_DATABASE,
-  user: PG_USER,
-  password: PG_PASSWORD,
+  ...(process.env.DATABASE_URL ? { connectionString: process.env.DATABASE_URL } : {
+    host: PG_HOST,
+    port: PG_PORT ? Number(PG_PORT) : 5432,
+    database: PG_DATABASE,
+    user: PG_USER,
+    password: PG_PASSWORD,
+  }),
+  connectionTimeoutMillis: 10000,
 });
 
 pgPool.on("error", (err: Error) => {
