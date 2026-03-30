@@ -39,13 +39,19 @@ export class MessageService {
     await this.conversationRepository.updateUpdatedAt(input.conversationId);
 
     // Publish MQTT event
-    await this.mqttService.publish(
-      MqttTopics.chat.message(input.conversationId),
-      {
-        ...message,
-        timestamp: new Date().toISOString(),
-      },
-    );
+    try {
+      if (this.mqttService) {
+        await this.mqttService.publish(
+          MqttTopics.chat.message(input.conversationId),
+          {
+            ...message,
+            timestamp: new Date().toISOString(),
+          },
+        );
+      }
+    } catch (mqttError) {
+      console.error("Failed to publish MQTT message:", mqttError);
+    }
 
     // Send Push Notification
     try {

@@ -160,6 +160,11 @@ export class MqttService {
                 return;
             }
 
+            const timeoutId = setTimeout(() => {
+                cleanup();
+                resolve(); // resolve instead of reject so we don't crash app on dev if mqtt down
+            }, 5000);
+
             const onConnect = (): void => {
                 cleanup();
                 resolve();
@@ -167,10 +172,11 @@ export class MqttService {
 
             const onError = (error: Error): void => {
                 cleanup();
-                reject(error);
+                resolve(); // resolve so app can continue
             };
 
             const cleanup = (): void => {
+                clearTimeout(timeoutId);
                 client.off("connect", onConnect);
                 client.off("error", onError);
             };
