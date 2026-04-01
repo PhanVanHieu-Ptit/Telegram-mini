@@ -30,13 +30,14 @@ export class MessageService {
       throw new UnauthorizedError("User is not a member of this conversation");
     }
 
-    const message = await this.messageRepository.create({
-      conversationId: input.conversationId,
-      senderId: input.senderId,
-      content: input.content,
-    });
-
-    await this.conversationRepository.updateUpdatedAt(input.conversationId);
+    const [message] = await Promise.all([
+      this.messageRepository.create({
+        conversationId: input.conversationId,
+        senderId: input.senderId,
+        content: input.content,
+      }),
+      this.conversationRepository.updateUpdatedAt(input.conversationId),
+    ]);
 
     // Publish MQTT event
     try {

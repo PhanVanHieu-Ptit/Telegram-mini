@@ -62,23 +62,20 @@ export const pgPool = new Pool({
       (!explicitDisableSsl && (isRender || isProduction || !isLocalHost));
 
     if (!shouldUseSsl) {
-      return {};
+      return { ssl: undefined };
     }
 
     return {
-      ssl: process.env.PG_SSL_REJECT_UNAUTHORIZED === "false"
-        ? { rejectUnauthorized: false }
-        : true,
+      ssl: {
+        rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED === "true",
+      },
     };
   })(),
-  ...(process.env.DATABASE_URL ? { connectionString: process.env.DATABASE_URL } : {
-    host: PG_HOST,
-    port: PG_PORT ? Number(PG_PORT) : 5432,
-    database: PG_DATABASE,
-    user: PG_USER,
-    password: PG_PASSWORD,
-  }),
-  connectionTimeoutMillis: 10000,
+  host: PG_HOST,
+  port: PG_PORT ? Number(PG_PORT) : 5432,
+  database: PG_DATABASE,
+  user: PG_USER,
+  password: PG_PASSWORD,
 });
 
 pgPool.on("error", (err: Error) => {
