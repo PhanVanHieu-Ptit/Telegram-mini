@@ -12,8 +12,14 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 1
+          fetch-depth: 0
       - name: Push to hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: git push --force https://phanvanhieu:$HF_TOKEN@huggingface.co/spaces/phanvanhieu/3hchat main
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+          git checkout --orphan deploy-hf
+          git add -A
+          git commit -m "Deploy to HuggingFace"
+          git push --force https://phanvanhieu:$HF_TOKEN@huggingface.co/spaces/phanvanhieu/3hchat deploy-hf:main
