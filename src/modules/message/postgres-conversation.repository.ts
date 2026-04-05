@@ -1,5 +1,6 @@
 import { pgPool } from "../../core/db";
 import { AppError } from "../../core/errors/AppError";
+import { mongoMessageRepository } from "./mongo-message.repository";
 
 import type { IConversationRepository } from "./message.repositories";
 import type { ConversationDTO, ConversationListItemDTO, MessageDTO, ConversationMember } from "./message.types";
@@ -288,9 +289,7 @@ export class PostgresConversationRepository implements IConversationRepository {
   }
 
   private async getLastMessage(messageId: string): Promise<MessageDTO | undefined> {
-    // This will be implemented to fetch from MongoDB
-    // For now, returning undefined
-    return undefined;
+    return await mongoMessageRepository.findById(messageId) ?? undefined;
   }
 
   async joinConversation(

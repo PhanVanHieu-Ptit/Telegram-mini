@@ -32,6 +32,11 @@ export const callController = {
     const userId = extractUserId(request);
     if (!userId) return reply.status(401).send({ error: 'Unauthorized: Missing user ID' });
 
+    request.log.info(
+      { callerId: userId, receiverId: request.body.receiverId, tokenFields: Object.keys((request as any).user ?? {}) },
+      'startCall invoked'
+    );
+
     try {
       const callDto = await callService.startCall({
         callerId: userId,
@@ -39,22 +44,47 @@ export const callController = {
         callType: request.body.callType,
       });
 
-      // Look up caller info from DB for display name & avatar
-      const callerUser = await authService.findUserById(userId);
-      const callerName = callerUser?.username ?? (request as any).user?.email ?? userId;
-      const callerAvatar = callerUser?.avatar ?? null;
+      // Look up caller info — isolated so a DB error cannot suppress notifications
+      let callerName: string = (request as any).user?.email ?? userId;
+      let callerAvatar: string | null = null;
+      try {
+        const callerUser = await authService.findUserById(userId);
+        callerName = callerUser?.username ?? (request as any).user?.email ?? userId;
+        callerAvatar = callerUser?.avatar ?? null;
+      } catch (lookupErr: unknown) {
+        request.log.warn({ err: lookupErr, userId }, 'Could not look up caller info for call notification');
+      }
 
-      // Notify callee through rtc-service (non-blocking)
-      void notifyUser('incoming-call', request.body.receiverId, {
+      const callPayload = {
         callId: callDto.id,
         callerId: userId,
         callerName,
         callerAvatar,
         roomId: callDto.roomName,
         callType: callDto.callType,
+      };
+
+      // 1. Notify via backend socket.io (users connected for messaging are already here)
+      const io = (request.server as any).io;
+      if (io) {
+        io.to(`user:${request.body.receiverId}`).emit('incoming-call', callPayload);
+        request.log.info({ receiverId: request.body.receiverId }, 'Backend socket incoming-call emitted');
+      } else {
+        request.log.warn('Backend socket.io not available');
+      }
+
+      // 2. Notify via RTC service (for receivers connected to RTC service)
+      void notifyUser('incoming-call', request.body.receiverId, callPayload).then(() => {
+        request.log.info({ receiverId: request.body.receiverId }, 'RTC incoming-call notified');
       });
 
       // FCM push notification for when callee is offline/background (non-blocking)
+      notificationService.getTokenCount(request.body.receiverId).then((count) => {
+        if (count === 0) {
+          request.log.warn({ receiverId: request.body.receiverId }, 'No FCM tokens found for receiver — push notification will not be delivered');
+        }
+      }).catch(() => undefined);
+
       void notificationService.sendToUser({
         userId: request.body.receiverId,
         title: `Incoming ${callDto.callType} call`,
@@ -66,6 +96,8 @@ export const callController = {
           roomId: callDto.roomName,
           callType: callDto.callType,
         },
+      }).then((result) => {
+        request.log.info({ receiverId: request.body.receiverId, ...result }, 'FCM call notification result');
       }).catch((err: unknown) => {
         request.log.warn({ err }, 'Failed to send FCM call notification');
       });
@@ -88,12 +120,16 @@ export const callController = {
     try {
       const callDto = await callService.acceptCall(request.body.callId, userId);
 
-      // Notify caller that callee accepted (rtc-service handles the SDP exchange)
-      void notifyUser('call-status-update', callDto.callerId, {
-        callId: callDto.id,
-        status: 'accepted',
-        roomId: callDto.roomName,
-      });
+      const acceptPayload = { callId: callDto.id, status: 'accepted', roomId: callDto.roomName };
+
+      // Notify caller via backend socket
+      const io = (request.server as any).io;
+      if (io) {
+        io.to(`user:${callDto.callerId}`).emit('call-status-update', acceptPayload);
+      }
+
+      // Notify caller via RTC service
+      void notifyUser('call-status-update', callDto.callerId, acceptPayload);
 
       return reply.status(200).send(callDto);
     } catch (error: any) {
@@ -117,10 +153,16 @@ export const callController = {
     try {
       const callDto = await callService.rejectCall(request.body.callId, userId, request.body.reason);
 
-      void notifyUser('call-rejected', callDto.callerId, {
-        callId: callDto.id,
-        reason: request.body.reason ?? 'declined',
-      });
+      const rejectPayload = { callId: callDto.id, reason: request.body.reason ?? 'declined' };
+
+      // Notify caller via backend socket
+      const io = (request.server as any).io;
+      if (io) {
+        io.to(`user:${callDto.callerId}`).emit('call-rejected', rejectPayload);
+      }
+
+      // Notify caller via RTC service
+      void notifyUser('call-rejected', callDto.callerId, rejectPayload);
 
       return reply.status(200).send(callDto);
     } catch (error: any) {
@@ -145,11 +187,16 @@ export const callController = {
 
       // Notify the OTHER party (whoever is not ending the call)
       const remoteUserId = callDto.callerId === userId ? callDto.receiverId : callDto.callerId;
-      void notifyUser('call-ended', remoteUserId, {
-        callId: callDto.id,
-        endedBy: userId,
-        duration: callDto.duration,
-      });
+      const endPayload = { callId: callDto.id, endedBy: userId, duration: callDto.duration };
+
+      // Notify via backend socket
+      const io = (request.server as any).io;
+      if (io) {
+        io.to(`user:${remoteUserId}`).emit('call-ended', endPayload);
+      }
+
+      // Notify via RTC service
+      void notifyUser('call-ended', remoteUserId, endPayload);
 
       return reply.send(callDto);
     } catch (error: any) {

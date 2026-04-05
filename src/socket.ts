@@ -144,6 +144,19 @@ export function setupSocketIOServer(
 
           const room = `conversation:${conversationId}`;
           io.to(room).emit("message:new", message);
+
+          // Emit conversation:updated to each member's user room so the
+          // conversation list refreshes for off-room recipients
+          conversationRepository.getMemberIds(conversationId)
+            .then((memberIds) => {
+              for (const memberId of memberIds) {
+                io.to(`user:${memberId}`).emit("conversation:updated", {
+                  conversationId,
+                  lastMessage: message,
+                });
+              }
+            })
+            .catch(console.error);
         } catch (error: unknown) {
           const message =
             error instanceof Error ? error.message : "Failed to send message";

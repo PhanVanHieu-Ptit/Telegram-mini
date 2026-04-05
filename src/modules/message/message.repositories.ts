@@ -25,6 +25,8 @@ export interface IConversationRepository {
 
   updateUpdatedAt(conversationId: string): Promise<void>;
 
+  updateLastMessage(conversationId: string, messageId: string): Promise<void>;
+
   updateLastReadMessage(
     conversationId: string,
     userId: string,
