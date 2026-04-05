@@ -46,10 +46,15 @@ export class MessageController {
 
     try {
       const message: MessageDTO = await this.service.sendMessage({ conversationId, senderId, content });
+
+      await reply.code(200).send(message);
+
       if (request.server.io) {
-        request.server.io.emit("message:new", message);
+        setImmediate(() => {
+          request.server.io?.emit("message:new", message);
+        });
       }
-      void reply.code(200).send(message);
+
     } catch (err: any) {
       const statusCode = err.statusCode || 500;
       void reply.code(statusCode).send({ error: (err as Error).message });

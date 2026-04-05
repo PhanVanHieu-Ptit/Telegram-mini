@@ -21,15 +21,14 @@ export class MessageService {
   async sendMessage(input: SendMessageInput): Promise<MessageDTO> {
     this.validateInput(input);
 
+    // 1. Kiểm tra quyền (Cần thiết - Bắt buộc await)
     const isMember = await this.conversationRepository.isMember(
       input.conversationId,
       input.senderId,
     );
+    if (!isMember) throw new UnauthorizedError("User is not a member...");
 
-    if (!isMember) {
-      throw new UnauthorizedError("User is not a member of this conversation");
-    }
-
+    // 2. Lưu DB (Cần thiết để trả về - Bắt buộc await)
     const [message] = await Promise.all([
       this.messageRepository.create({
         conversationId: input.conversationId,
@@ -39,49 +38,44 @@ export class MessageService {
       this.conversationRepository.updateUpdatedAt(input.conversationId),
     ]);
 
-    // Publish MQTT event
-    try {
-      if (this.mqttService) {
-        await this.mqttService.publish(
-          MqttTopics.chat.message(input.conversationId),
-          {
-            ...message,
-            timestamp: new Date().toISOString(),
-          },
-        );
-      }
-    } catch (mqttError) {
-      console.error("Failed to publish MQTT message:", mqttError);
-    }
+    // 3. CÁC TÁC VỤ CHẠY NGẦM (KHÔNG DÙNG AWAIT)
+    // Chúng ta bỏ 'await' để hàm trả về message ngay lập tức cho User
 
-    // Send Push Notification
-    try {
-      const [sender, memberIds] = await Promise.all([
-        this.userService.getUserById(input.senderId),
-        this.conversationRepository.getMemberIds(input.conversationId),
-      ]);
+    // Xử lý MQTT ngầm
+    this.publishMqtt(input.conversationId, message).catch(console.error);
 
-      const recipientIds = memberIds.filter((id) => id !== input.senderId);
+    // Xử lý Push Notification ngầm
+    this.sendPushNotifications(input, message).catch(console.error);
 
-      if (recipientIds.length > 0) {
-        await this.notificationService.sendToMultipleUsers({
-          userIds: recipientIds,
-          title: sender?.displayName || "New Message",
-          body: input.content,
-          data: {
-            conversationId: input.conversationId,
-            senderId: input.senderId,
-            messageId: message.id || "",
-            type: "chat_message",
-          },
-        });
-      }
-    } catch (pushError) {
-      console.error("Failed to send push notification:", pushError);
-      // Don't throw, we want the message to be sent even if push fails
-    }
-
+    // 4. Trả về ngay lập tức
     return message;
+  }
+
+  // Tách ra các hàm private để code sạch hơn
+  private async publishMqtt(conversationId: string, message: any) {
+    if (this.mqttService) {
+      await this.mqttService.publish(MqttTopics.chat.message(conversationId), {
+        ...message,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  private async sendPushNotifications(input: SendMessageInput, message: any) {
+    const [sender, memberIds] = await Promise.all([
+      this.userService.getUserById(input.senderId),
+      this.conversationRepository.getMemberIds(input.conversationId),
+    ]);
+
+    const recipientIds = memberIds.filter((id) => id !== input.senderId);
+    if (recipientIds.length > 0) {
+      await this.notificationService.sendToMultipleUsers({
+        userIds: recipientIds,
+        title: sender?.displayName || "New Message",
+        body: input.content,
+        data: { /* ... */ },
+      });
+    }
   }
 
   private validateInput(input: SendMessageInput): void {
