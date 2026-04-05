@@ -5,11 +5,22 @@ import { SendNotificationPayload, SendNotificationToMultipleUsersPayload } from 
 export class NotificationService {
   constructor(private tokenService: TokenService) {}
 
+  async getTokenCount(userId: string): Promise<number> {
+    const tokens = await this.tokenService.getTokensByUserId(userId);
+    return tokens.length;
+  }
+
   async sendToUser(payload: SendNotificationPayload): Promise<{ success: number; failure: number }> {
     const { userId, title, body, data } = payload;
     const tokens = await this.tokenService.getTokensByUserId(userId);
 
-    if (tokens.length === 0 || !messaging) {
+    if (tokens.length === 0) {
+      console.warn(`[NotificationService] sendToUser: no FCM tokens registered for userId=${userId}`);
+      return { success: 0, failure: 0 };
+    }
+
+    if (!messaging) {
+      console.warn(`[NotificationService] sendToUser: Firebase messaging is null — FCM not configured. userId=${userId}`);
       return { success: 0, failure: 0 };
     }
 

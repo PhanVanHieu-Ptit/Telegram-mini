@@ -29,14 +29,14 @@ export class MessageService {
     if (!isMember) throw new UnauthorizedError("User is not a member...");
 
     // 2. Lưu DB (Cần thiết để trả về - Bắt buộc await)
-    const [message] = await Promise.all([
-      this.messageRepository.create({
-        conversationId: input.conversationId,
-        senderId: input.senderId,
-        content: input.content,
-      }),
-      this.conversationRepository.updateUpdatedAt(input.conversationId),
-    ]);
+    const message = await this.messageRepository.create({
+      conversationId: input.conversationId,
+      senderId: input.senderId,
+      content: input.content,
+    });
+
+    // Cập nhật last_message_id và updated_at cho conversation
+    await this.conversationRepository.updateLastMessage(input.conversationId, message.id);
 
     // 3. CÁC TÁC VỤ CHẠY NGẦM (KHÔNG DÙNG AWAIT)
     // Chúng ta bỏ 'await' để hàm trả về message ngay lập tức cho User

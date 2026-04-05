@@ -2,6 +2,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import type { Server as SocketIOServer } from "socket.io";
 
 import { MessageService } from "./message.service";
+import type { IConversationRepository } from "./message.repositories";
 import type { SendMessageInput, MessageDTO, CreateConversationInput } from "./message.types";
 import { MqttService } from "../mqtt/mqtt.service";
 
@@ -26,9 +27,11 @@ export type FastifyRequestWithIO<
 
 export class MessageController {
   private readonly service: MessageService;
+  private readonly conversationRepository: IConversationRepository;
 
-  constructor(service: MessageService) {
+  constructor(service: MessageService, conversationRepository: IConversationRepository) {
     this.service = service;
+    this.conversationRepository = conversationRepository;
   }
 
   async createMessage(
@@ -50,9 +53,11 @@ export class MessageController {
       await reply.code(200).send(message);
 
       if (request.server.io) {
+        const io = request.server.io;
         setImmediate(() => {
-          request.server.io?.emit("message:new", message);
+          io.emit("message:new", message);
         });
+        this.emitConversationUpdated(io, message).catch(console.error);
       }
 
     } catch (err: any) {
@@ -197,6 +202,16 @@ export class MessageController {
       void reply.code(statusCode).send({ error: (err as Error).message });
     }
   }
+
+  private async emitConversationUpdated(io: SocketIOServer, message: MessageDTO): Promise<void> {
+    const memberIds = await this.conversationRepository.getMemberIds(message.conversationId);
+    for (const memberId of memberIds) {
+      io.to(`user:${memberId}`).emit("conversation:updated", {
+        conversationId: message.conversationId,
+        lastMessage: message,
+      });
+    }
+  }
 }
 
 
@@ -219,6 +234,7 @@ export const messageController = new MessageController(
     mqttService,
     notificationService,
     userService
-  )
+  ),
+  conversationRepository,
 );
 
