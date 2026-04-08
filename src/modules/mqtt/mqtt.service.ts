@@ -172,7 +172,7 @@ export class MqttService {
 
             const onError = (error: Error): void => {
                 cleanup();
-                resolve(); // resolve so app can continue
+                reject(error);
             };
 
             const cleanup = (): void => {
