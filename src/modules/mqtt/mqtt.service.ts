@@ -15,6 +15,7 @@ export class MqttService {
             clean: true,
             connectTimeout: 30000,
             reconnectPeriod: 1000,
+            rejectUnauthorized: false,
         }
     ) { }
 
