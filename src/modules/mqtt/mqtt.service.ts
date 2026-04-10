@@ -5,23 +5,38 @@ export class MqttService {
     private client: MqttClient | null = null;
 
     private readonly subscribedTopics = new Set<string>();
+    
+    private brokerUrl: string;
+    private options: IClientOptions;
 
     constructor(
-        private readonly brokerUrl: string = process.env.PUBLIC_MQTT_URL ?? "mqtt://localhost:1883",
-        private readonly options: IClientOptions = {
-            clientId: `react_client_${Math.random().toString(16).substring(2, 8)}`,
-            username: process.env.PUBLIC_MQTT_USER,
-            password: process.env.PUBLIC_MQTT_PASS,
-            clean: true,
-            connectTimeout: 30000,
-            reconnectPeriod: 1000,
-            rejectUnauthorized: false,
-        }
-    ) { }
+        brokerUrl?: string,
+        options?: IClientOptions
+    ) { 
+        this.brokerUrl = brokerUrl || "";
+        this.options = options || {};
+    }
 
     async connect(): Promise<void> {
         if (this.client?.connected) {
             return;
+        }
+
+        if (!this.brokerUrl) {
+            this.brokerUrl = process.env.PUBLIC_MQTT_URL ?? "mqtt://localhost:1883";
+        }
+        
+        if (!this.options.username && process.env.PUBLIC_MQTT_USER) {
+            this.options = {
+                clientId: `react_client_${Math.random().toString(16).substring(2, 8)}`,
+                username: process.env.PUBLIC_MQTT_USER,
+                password: process.env.PUBLIC_MQTT_PASS,
+                clean: true,
+                connectTimeout: 30000,
+                reconnectPeriod: 1000,
+                rejectUnauthorized: false,
+                ...this.options
+            };
         }
 
         if (!this.client) {
