@@ -203,13 +203,45 @@ export class MessageController {
     }
   }
 
+  async deleteConversation(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const { id: conversationId } = request.params;
+    const authenticatedUser = (request as any).user;
+    const userId = authenticatedUser?.userId;
+
+    if (!userId) {
+      void reply.code(401).send({ error: "Unauthorized" });
+      return;
+    }
+
+    try {
+      await this.service.deleteConversation(conversationId, userId);
+      void reply.code(200).send({ success: true });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
+    }
+  }
+
   private async emitConversationUpdated(io: SocketIOServer, message: MessageDTO): Promise<void> {
     const memberIds = await this.conversationRepository.getMemberIds(message.conversationId);
     for (const memberId of memberIds) {
+      // Emit via socket for connected clients
       io.to(`user:${memberId}`).emit("conversation:updated", {
         conversationId: message.conversationId,
         lastMessage: message,
       });
+      // Also emit via MQTT so clients only subscribed to MQTT get the creation events
+      if (this.service['mqttService']) {
+        const mqttService = this.service['mqttService'] as MqttService;
+        await mqttService.publish(`user/${memberId}/events`, {
+           type: 'CONVERSATION_UPDATED',
+           conversationId: message.conversationId,
+           lastMessage: message,
+        }).catch(err => console.error("Failed to publish mqtt event", err));
+      }
     }
   }
 }

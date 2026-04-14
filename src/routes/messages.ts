@@ -178,6 +178,40 @@ const routes: FastifyPluginAsync = async (fastify) => {
       await messageController.joinConversation(request as any, reply);
     },
   );
+ 
+  // Delete conversation endpoint
+  fastify.delete(
+    '/conversations/:id',
+    {
+      schema: {
+        summary: 'Delete a conversation',
+        tags: ['conversations'],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string' },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+            },
+          },
+          400: ErrorResponse,
+          401: ErrorResponse,
+          500: ErrorResponse,
+        },
+      },
+      preHandler: fastify.authenticate,
+    },
+    async (request, reply) => {
+      await messageController.deleteConversation(request as any, reply);
+    },
+  );
   fastify.post(
     '/messages',
     {
