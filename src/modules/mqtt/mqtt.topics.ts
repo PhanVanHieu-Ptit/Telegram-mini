@@ -38,6 +38,7 @@ export const MqttTopics = {
     // User topics
     user: {
         online: (userId: string) => `user/${userId}/online`,
+        events: (userId: string) => `user/${userId}/events`,
     },
 } as const;
 
@@ -99,11 +100,18 @@ export function parseTopic(topic: string): ParsedTopic {
         }
     }
 
-    if (parts.length === 3 && parts[0] === 'user' && parts[2] === 'online') {
-        return {
-            type: 'online',
-            userId: parts[1],
-        };
+    if (parts.length === 3 && parts[0] === 'user') {
+        if (parts[2] === 'online') {
+            return {
+                type: 'online',
+                userId: parts[1],
+            };
+        } else if (parts[2] === 'events') {
+            return {
+                type: 'events',
+                userId: parts[1],
+            } as any;
+        }
     }
 
     return null;

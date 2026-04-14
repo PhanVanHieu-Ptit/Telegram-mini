@@ -76,6 +76,10 @@ export class MongoMessageRepository implements IMessageRepository {
       { $addToSet: { seenBy: userId } },
     ).exec();
   }
+
+  async deleteByConversationId(conversationId: string): Promise<void> {
+    await this.messageModel.deleteMany({ conversationId }).exec();
+  }
 }
 
 export const mongoMessageRepository = new MongoMessageRepository(MessageModel);

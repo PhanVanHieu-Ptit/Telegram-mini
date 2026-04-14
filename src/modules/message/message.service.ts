@@ -196,4 +196,41 @@ export class MessageService {
       );
     }
   }
+
+  async deleteConversation(conversationId: string, userId: string): Promise<void> {
+    if (!conversationId?.trim()) {
+      throw new ValidationError("conversationId is required");
+    }
+
+    if (!userId?.trim()) {
+      throw new ValidationError("userId is required");
+    }
+
+    // 1. Check if member and has permission
+    const role = await this.conversationRepository.getMemberRole(conversationId, userId);
+    if (!role) {
+      throw new UnauthorizedError("User is not a member of this conversation");
+    }
+
+    // For group chats, only owner or admin can delete. For private, either can.
+    // Actually, usually in private chat "delete" means "clear for me" or "delete for both".
+    // Let's assume delete for both if they have permission.
+    const memberIds = await this.conversationRepository.getMemberIds(conversationId);
+
+    // 2. Delete from Postgres (cascades to members)
+    await this.conversationRepository.deleteConversation(conversationId);
+
+    // 3. Delete from Mongo (messages)
+    await this.messageRepository.deleteByConversationId(conversationId);
+
+    // 4. Notify members
+    if (this.mqttService) {
+      for (const memberId of memberIds) {
+        await this.mqttService.publish(`user/${memberId}/events`, {
+          type: 'CONVERSATION_DELETED',
+          conversationId,
+        }).catch(err => console.error("Failed to publish mqtt event", err));
+      }
+    }
+  }
 }

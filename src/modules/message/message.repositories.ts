@@ -18,6 +18,8 @@ export interface IMessageRepository {
   deleteById(id: string): Promise<void>;
 
   markMessagesSeen(conversationId: string, userId: string): Promise<void>;
+
+  deleteByConversationId(conversationId: string): Promise<void>;
 }
 
 export interface IConversationRepository {
@@ -51,5 +53,9 @@ export interface IConversationRepository {
   ): Promise<void>;
 
   getMemberIds(conversationId: string): Promise<string[]>;
+
+  deleteConversation(conversationId: string): Promise<void>;
+
+  getMemberRole(conversationId: string, userId: string): Promise<string | null>;
 }
 

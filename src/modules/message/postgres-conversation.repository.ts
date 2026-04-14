@@ -320,5 +320,32 @@ export class PostgresConversationRepository implements IConversationRepository {
 
     return result.rows.map((row) => row.user_id);
   }
+
+  async deleteConversation(conversationId: string): Promise<void> {
+    await pgPool.query(
+      `
+        DELETE FROM conversations
+        WHERE id = $1
+      `,
+      [conversationId],
+    );
+  }
+
+  async getMemberRole(conversationId: string, userId: string): Promise<string | null> {
+    const result = await pgPool.query<{ role: string }>(
+      `
+        SELECT role
+        FROM conversation_members
+        WHERE conversation_id = $1 AND user_id = $2
+      `,
+      [conversationId, userId],
+    );
+
+    if (result.rowCount === 0) {
+      return null;
+    }
+
+    return result.rows[0].role;
+  }
 }
 
