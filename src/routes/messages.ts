@@ -18,9 +18,14 @@ const MessageResponse = {
     id: { type: 'string' },
     conversationId: { type: 'string' },
     senderId: { type: 'string' },
+    type: { type: 'string', nullable: true },
     content: { type: 'string' },
+    attachments: { type: 'array', items: { type: 'object', additionalProperties: true }, nullable: true },
+    metadata: { type: 'object', additionalProperties: true, nullable: true },
+    reactions: { type: 'object', additionalProperties: true, nullable: true },
+    seenBy: { type: 'array', items: { type: 'string' }, nullable: true },
     createdAt: { type: 'string', format: 'date-time' },
-    updatedAt: { type: 'string', format: 'date-time' },
+    updatedAt: { type: 'string', format: 'date-time', nullable: true },
   },
 };
 
@@ -64,8 +69,11 @@ const ConversationResponse = {
         conversationId: { type: "string" },
         senderId: { type: "string" },
         content: { type: "string" },
-        type: { type: "string" },
-        seenBy: { type: "array", items: { type: "string" } },
+        type: { type: "string", nullable: true },
+        attachments: { type: 'array', items: { type: 'object', additionalProperties: true }, nullable: true },
+        metadata: { type: 'object', additionalProperties: true, nullable: true },
+        reactions: { type: 'object', additionalProperties: true, nullable: true },
+        seenBy: { type: "array", items: { type: "string" }, nullable: true },
         createdAt: { type: "string", format: "date-time" },
         updatedAt: { type: "string", format: "date-time", nullable: true },
       },
@@ -231,6 +239,38 @@ const routes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       await messageController.createMessage(request as any, reply);
+    },
+  );
+
+  fastify.post(
+    '/messages/:messageId/react',
+    {
+      schema: {
+        summary: 'React to a message',
+        tags: ['messages'],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['messageId'],
+          properties: { messageId: { type: 'string' } },
+        },
+        body: {
+          type: 'object',
+          required: ['emoji'],
+          properties: { emoji: { type: 'string' } },
+        },
+        response: {
+          200: { type: 'object', properties: { success: { type: 'boolean' } } },
+          400: ErrorResponse,
+          401: ErrorResponse,
+          404: ErrorResponse,
+          500: ErrorResponse,
+        },
+      },
+      preHandler: fastify.authenticate,
+    },
+    async (request, reply) => {
+      await messageController.reactMessage(request as any, reply);
     },
   );
 

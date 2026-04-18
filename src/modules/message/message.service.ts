@@ -33,6 +33,9 @@ export class MessageService {
       conversationId: input.conversationId,
       senderId: input.senderId,
       content: input.content,
+      type: input.type,
+      attachments: input.attachments,
+      metadata: input.metadata,
     });
 
     // Cập nhật last_message_id và updated_at cho conversation
@@ -194,6 +197,23 @@ export class MessageService {
           timestamp: new Date().toISOString(),
         },
       );
+    }
+  }
+
+  async reactMessage(conversationId: string, userId: string, messageId: string, emoji: string): Promise<void> {
+    if (!conversationId || !userId || !messageId || !emoji) throw new ValidationError("Missing params");
+    const isMember = await this.conversationRepository.isMember(conversationId, userId);
+    if (!isMember) throw new UnauthorizedError("User is not a member of this conversation");
+
+    await this.messageRepository.addReaction(messageId, emoji, userId);
+
+    // Publish reaction event
+    const message = await this.messageRepository.findById(messageId);
+    if (message && this.mqttService) {
+      await this.mqttService.publish(
+        MqttTopics.chat.message(conversationId),
+        { ...message, eventType: 'REACTION_UPDATE' },
+      ).catch(console.error);
     }
   }
 
