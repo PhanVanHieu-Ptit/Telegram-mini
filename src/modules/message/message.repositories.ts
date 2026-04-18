@@ -8,7 +8,7 @@ import type {
 
 export interface IMessageRepository {
   create(
-    data: Pick<MessageEntity, "conversationId" | "senderId" | "content"> & Partial<Pick<MessageEntity, "type" | "seenBy">>,
+    data: Pick<MessageEntity, "conversationId" | "senderId" | "content"> & Partial<Pick<MessageEntity, "type" | "seenBy" | "attachments" | "metadata" | "reactions">>,
   ): Promise<MessageDTO>;
 
   findById(id: string): Promise<MessageDTO | null>;
@@ -18,6 +18,8 @@ export interface IMessageRepository {
   deleteById(id: string): Promise<void>;
 
   markMessagesSeen(conversationId: string, userId: string): Promise<void>;
+
+  addReaction(messageId: string, emoji: string, userId: string): Promise<void>;
 
   deleteByConversationId(conversationId: string): Promise<void>;
 }

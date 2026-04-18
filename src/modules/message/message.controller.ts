@@ -225,6 +225,31 @@ export class MessageController {
     }
   }
 
+  async reactMessage(
+    request: FastifyRequest<{ Params: { messageId: string }; Body: { emoji: string } }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const { messageId } = request.params;
+    const { emoji } = request.body ?? {};
+    const authenticatedUser = (request as any).user;
+    const userId = authenticatedUser?.userId;
+
+    if (!userId) return void reply.code(401).send({ error: "Unauthorized" });
+    if (!emoji || !messageId) return void reply.code(400).send({ error: "missing params" });
+
+    try {
+      // Find conversationId from messageId
+      const msg = await this.service['messageRepository'].findById(messageId);
+      if (!msg) return void reply.code(404).send({ error: "message not found" });
+
+      await this.service.reactMessage(msg.conversationId, userId, messageId, emoji);
+      void reply.code(200).send({ success: true });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
+    }
+  }
+
   private async emitConversationUpdated(io: SocketIOServer, message: MessageDTO): Promise<void> {
     const memberIds = await this.conversationRepository.getMemberIds(message.conversationId);
     for (const memberId of memberIds) {
