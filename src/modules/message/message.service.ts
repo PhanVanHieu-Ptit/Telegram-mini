@@ -36,6 +36,7 @@ export class MessageService {
       type: input.type,
       attachments: input.attachments,
       metadata: input.metadata,
+      mentions: input.mentions,
     });
 
     // Cập nhật last_message_id và updated_at cho conversation
@@ -251,6 +252,52 @@ export class MessageService {
           conversationId,
         }).catch(err => console.error("Failed to publish mqtt event", err));
       }
+    }
+  }
+
+  async searchMessages(query: any): Promise<MessageDTO[]> {
+    return this.messageRepository.searchMessages(query);
+  }
+
+  async hideMessage(conversationId: string, messageId: string, userId: string): Promise<void> {
+    const isMember = await this.conversationRepository.isMember(conversationId, userId);
+    if (!isMember) throw new UnauthorizedError("User is not a member of this conversation");
+    await this.messageRepository.hideMessage(messageId, userId);
+  }
+
+  async unhideMessage(conversationId: string, messageId: string, userId: string): Promise<void> {
+    const isMember = await this.conversationRepository.isMember(conversationId, userId);
+    if (!isMember) throw new UnauthorizedError("User is not a member of this conversation");
+    await this.messageRepository.unhideMessage(messageId, userId);
+  }
+
+  async pinMessage(conversationId: string, messageId: string, userId: string): Promise<void> {
+    const isMember = await this.conversationRepository.isMember(conversationId, userId);
+    if (!isMember) throw new UnauthorizedError("User is not a member of this conversation");
+    await this.messageRepository.pinMessage(messageId);
+    
+    // Notify via MQTT
+    const message = await this.messageRepository.findById(messageId);
+    if (message && this.mqttService) {
+      await this.mqttService.publish(
+        MqttTopics.chat.message(conversationId),
+        { ...message, eventType: 'MESSAGE_PINNED' },
+      ).catch(console.error);
+    }
+  }
+
+  async unpinMessage(conversationId: string, messageId: string, userId: string): Promise<void> {
+    const isMember = await this.conversationRepository.isMember(conversationId, userId);
+    if (!isMember) throw new UnauthorizedError("User is not a member of this conversation");
+    await this.messageRepository.unpinMessage(messageId);
+    
+    // Notify via MQTT
+    const message = await this.messageRepository.findById(messageId);
+    if (message && this.mqttService) {
+      await this.mqttService.publish(
+        MqttTopics.chat.message(conversationId),
+        { ...message, eventType: 'MESSAGE_UNPINNED' },
+      ).catch(console.error);
     }
   }
 }

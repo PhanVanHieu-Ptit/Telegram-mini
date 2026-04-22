@@ -38,7 +38,7 @@ export class MessageController {
     request: FastifyRequestWithIO<CreateMessageBody>,
     reply: FastifyReply,
   ): Promise<void> {
-    const { conversationId, senderId, content } = request.body ?? {};
+    const { conversationId, senderId, content, type, attachments, metadata } = request.body ?? {};
 
     if (!conversationId || !senderId || !content) {
       void reply.code(400).send({
@@ -48,7 +48,14 @@ export class MessageController {
     }
 
     try {
-      const message: MessageDTO = await this.service.sendMessage({ conversationId, senderId, content });
+      const message: MessageDTO = await this.service.sendMessage({ 
+        conversationId, 
+        senderId, 
+        content,
+        type,
+        attachments,
+        metadata
+      });
 
       await reply.code(200).send(message);
 
@@ -267,11 +274,118 @@ export class MessageController {
            lastMessage: message,
         }).catch(err => console.error("Failed to publish mqtt event", err));
       }
+  async searchMessages(
+    request: FastifyRequest<{ Querystring: any }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const authenticatedUser = (request as any).user;
+    if (!authenticatedUser?.userId) return void reply.code(401).send({ error: "Unauthorized" });
+
+    try {
+      // Need to parse types and senderIds from query
+      const { keyword, type, senderId, fromDate, toDate, cursor } = request.query as any;
+      const types = type ? (Array.isArray(type) ? type : [type]) : [];
+      const senderIds = senderId ? (Array.isArray(senderId) ? senderId : [senderId]) : [];
+
+      const messages = await this.service.searchMessages({
+        keyword,
+        types,
+        senderIds,
+        fromDate,
+        toDate,
+        cursor,
+      });
+      void reply.code(200).send(messages);
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
+    }
+  }
+
+  async hideMessage(
+    request: FastifyRequest<{ Params: { messageId: string }; Body: { conversationId: string } }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const { messageId } = request.params;
+    const { conversationId } = request.body ?? {};
+    const authenticatedUser = (request as any).user;
+    const userId = authenticatedUser?.userId;
+
+    if (!userId) return void reply.code(401).send({ error: "Unauthorized" });
+    if (!conversationId) return void reply.code(400).send({ error: "conversationId required" });
+
+    try {
+      await this.service.hideMessage(conversationId, messageId, userId);
+      void reply.code(200).send({ success: true });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
+    }
+  }
+
+  async unhideMessage(
+    request: FastifyRequest<{ Params: { messageId: string }; Body: { conversationId: string } }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const { messageId } = request.params;
+    const { conversationId } = request.body ?? {};
+    const authenticatedUser = (request as any).user;
+    const userId = authenticatedUser?.userId;
+
+    if (!userId) return void reply.code(401).send({ error: "Unauthorized" });
+    if (!conversationId) return void reply.code(400).send({ error: "conversationId required" });
+
+    try {
+      await this.service.unhideMessage(conversationId, messageId, userId);
+      void reply.code(200).send({ success: true });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
+    }
+  }
+
+  async pinMessage(
+    request: FastifyRequest<{ Params: { messageId: string }; Body: { conversationId: string } }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const { messageId } = request.params;
+    const { conversationId } = request.body ?? {};
+    const authenticatedUser = (request as any).user;
+    const userId = authenticatedUser?.userId;
+
+    if (!userId) return void reply.code(401).send({ error: "Unauthorized" });
+    if (!conversationId) return void reply.code(400).send({ error: "conversationId required" });
+
+    try {
+      await this.service.pinMessage(conversationId, messageId, userId);
+      void reply.code(200).send({ success: true });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
+    }
+  }
+
+  async unpinMessage(
+    request: FastifyRequest<{ Params: { messageId: string }; Body: { conversationId: string } }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const { messageId } = request.params;
+    const { conversationId } = request.body ?? {};
+    const authenticatedUser = (request as any).user;
+    const userId = authenticatedUser?.userId;
+
+    if (!userId) return void reply.code(401).send({ error: "Unauthorized" });
+    if (!conversationId) return void reply.code(400).send({ error: "conversationId required" });
+
+    try {
+      await this.service.unpinMessage(conversationId, messageId, userId);
+      void reply.code(200).send({ success: true });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
     }
   }
 }
-
-
 import { PostgresConversationRepository } from "./postgres-conversation.repository";
 import { MongoMessageRepository, MessageModel } from "./mongo-message.repository";
 import { TokenService } from "../notifications/token.service";

@@ -6,6 +6,9 @@ const MessageSchema = new Schema<MessageDocument>({
   type: { type: String, default: 'text' },
   attachments: { type: [Schema.Types.Mixed], default: [] },
   metadata: { type: Schema.Types.Mixed },
+  mentions: { type: [String], default: [] },
+  hiddenBy: { type: [String], default: [] },
+  isPinned: { type: Boolean, default: false },
   reactions: { type: Schema.Types.Mixed, default: {} },
   seenBy: { type: [String], default: [] },
   createdAt: { type: Date, default: Date.now },
@@ -13,6 +16,9 @@ const MessageSchema = new Schema<MessageDocument>({
 });
 
 MessageSchema.index({ conversationId: 1, createdAt: 1 });
+MessageSchema.index({ content: "text" });
+MessageSchema.index({ senderId: 1 });
+MessageSchema.index({ type: 1 });
 
 export const MessageModel = mongoose.models.Message || mongoose.model<MessageDocument>("Message", MessageSchema);
 
@@ -38,6 +44,9 @@ export class MongoMessageRepository implements IMessageRepository {
       type: doc.type,
       attachments: doc.attachments,
       metadata: doc.metadata,
+      mentions: doc.mentions,
+      hiddenBy: doc.hiddenBy,
+      isPinned: doc.isPinned,
       reactions: doc.reactions,
       seenBy: doc.seenBy,
       createdAt: doc.createdAt.toISOString(),
@@ -46,7 +55,7 @@ export class MongoMessageRepository implements IMessageRepository {
   }
 
   async create(
-    data: Pick<MessageEntity, "conversationId" | "senderId" | "content"> & Partial<Pick<MessageEntity, "type" | "seenBy" | "attachments" | "metadata">>
+    data: Pick<MessageEntity, "conversationId" | "senderId" | "content"> & Partial<Pick<MessageEntity, "type" | "seenBy" | "attachments" | "metadata" | "mentions" | "hiddenBy" | "isPinned">>
   ): Promise<MessageDTO> {
     const created = await this.messageModel.create({
       conversationId: data.conversationId,
@@ -55,6 +64,9 @@ export class MongoMessageRepository implements IMessageRepository {
       type: data.type || "text",
       attachments: data.attachments || [],
       metadata: data.metadata || null,
+      mentions: data.mentions || [],
+      hiddenBy: data.hiddenBy || [],
+      isPinned: data.isPinned || false,
       reactions: {},
       seenBy: data.seenBy || [],
     });
@@ -116,6 +128,62 @@ export class MongoMessageRepository implements IMessageRepository {
 
   async deleteByConversationId(conversationId: string): Promise<void> {
     await this.messageModel.deleteMany({ conversationId }).exec();
+  }
+
+  async searchMessages(query: any): Promise<MessageDTO[]> {
+    const { keyword, types, senderIds, fromDate, toDate, limit = 50, cursor } = query;
+    const filter: any = {};
+
+    if (keyword) {
+      filter.$text = { $search: keyword };
+    }
+    if (types && types.length > 0) {
+      filter.type = { $in: types };
+    }
+    if (senderIds && senderIds.length > 0) {
+      filter.senderId = { $in: senderIds };
+    }
+    if (fromDate || toDate) {
+      filter.createdAt = {};
+      if (fromDate) filter.createdAt.$gte = new Date(fromDate);
+      if (toDate) filter.createdAt.$lte = new Date(toDate);
+    }
+    if (cursor) {
+      // Assuming cursor is the createdAt of the last message
+      filter.createdAt = { ...filter.createdAt, $lt: new Date(cursor) };
+    }
+
+    const docs = await this.messageModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .exec();
+
+    return docs.map((doc) => this.mapMessage(doc));
+  }
+
+  async hideMessage(messageId: string, userId: string): Promise<void> {
+    await this.messageModel.findByIdAndUpdate(messageId, {
+      $addToSet: { hiddenBy: userId }
+    }).exec();
+  }
+
+  async unhideMessage(messageId: string, userId: string): Promise<void> {
+    await this.messageModel.findByIdAndUpdate(messageId, {
+      $pull: { hiddenBy: userId }
+    }).exec();
+  }
+
+  async pinMessage(messageId: string): Promise<void> {
+    await this.messageModel.findByIdAndUpdate(messageId, {
+      isPinned: true
+    }).exec();
+  }
+
+  async unpinMessage(messageId: string): Promise<void> {
+    await this.messageModel.findByIdAndUpdate(messageId, {
+      isPinned: false
+    }).exec();
   }
 }
 

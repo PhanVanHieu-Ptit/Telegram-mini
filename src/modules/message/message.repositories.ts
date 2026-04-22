@@ -8,7 +8,7 @@ import type {
 
 export interface IMessageRepository {
   create(
-    data: Pick<MessageEntity, "conversationId" | "senderId" | "content"> & Partial<Pick<MessageEntity, "type" | "seenBy" | "attachments" | "metadata" | "reactions">>,
+    data: Pick<MessageEntity, "conversationId" | "senderId" | "content"> & Partial<Pick<MessageEntity, "type" | "seenBy" | "attachments" | "metadata" | "reactions" | "mentions" | "hiddenBy" | "isPinned">>,
   ): Promise<MessageDTO>;
 
   findById(id: string): Promise<MessageDTO | null>;
@@ -22,6 +22,16 @@ export interface IMessageRepository {
   addReaction(messageId: string, emoji: string, userId: string): Promise<void>;
 
   deleteByConversationId(conversationId: string): Promise<void>;
+
+  searchMessages(query: any): Promise<MessageDTO[]>;
+
+  hideMessage(messageId: string, userId: string): Promise<void>;
+
+  unhideMessage(messageId: string, userId: string): Promise<void>;
+
+  pinMessage(messageId: string): Promise<void>;
+
+  unpinMessage(messageId: string): Promise<void>;
 }
 
 export interface IConversationRepository {

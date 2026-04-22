@@ -9,6 +9,7 @@ const MessageRequestBody = {
     conversationId: { type: 'string' },
     senderId: { type: 'string' },
     content: { type: 'string' },
+    mentions: { type: 'array', items: { type: 'string' }, nullable: true },
   },
 };
 
@@ -24,6 +25,9 @@ const MessageResponse = {
     metadata: { type: 'object', additionalProperties: true, nullable: true },
     reactions: { type: 'object', additionalProperties: true, nullable: true },
     seenBy: { type: 'array', items: { type: 'string' }, nullable: true },
+    mentions: { type: 'array', items: { type: 'string' }, nullable: true },
+    hiddenBy: { type: 'array', items: { type: 'string' }, nullable: true },
+    isPinned: { type: 'boolean', nullable: true },
     createdAt: { type: 'string', format: 'date-time' },
     updatedAt: { type: 'string', format: 'date-time', nullable: true },
   },
@@ -419,6 +423,80 @@ const routes: FastifyPluginAsync = async (fastify) => {
       await messageSummarizeController.summarize(request as any, reply);
     },
   );
+  fastify.get(
+    '/messages/search',
+    {
+      schema: {
+        summary: 'Search messages',
+        tags: ['messages'],
+        security: [{ bearerAuth: [] }],
+        querystring: {
+          type: 'object',
+          properties: {
+            keyword: { type: 'string' },
+            type: { anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] },
+            senderId: { anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }] },
+            fromDate: { type: 'string' },
+            toDate: { type: 'string' },
+            cursor: { type: 'string' },
+          },
+        },
+        response: {
+          200: {
+            type: "array",
+            items: MessageResponse,
+          },
+          400: ErrorResponse,
+          401: ErrorResponse,
+          500: ErrorResponse,
+        },
+      },
+      preHandler: fastify.authenticate,
+    },
+    async (request, reply) => {
+      await messageController.searchMessages(request as any, reply);
+    },
+  );
+
+  const messageActionSchema = {
+    schema: {
+      tags: ['messages'],
+      security: [{ bearerAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['messageId'],
+        properties: { messageId: { type: 'string' } },
+      },
+      body: {
+        type: 'object',
+        required: ['conversationId'],
+        properties: { conversationId: { type: 'string' } },
+      },
+      response: {
+        200: { type: 'object', properties: { success: { type: 'boolean' } } },
+        400: ErrorResponse,
+        401: ErrorResponse,
+        500: ErrorResponse,
+      },
+    },
+    preHandler: fastify.authenticate,
+  };
+
+  fastify.post('/messages/:messageId/hide', messageActionSchema, async (request, reply) => {
+    await messageController.hideMessage(request as any, reply);
+  });
+
+  fastify.post('/messages/:messageId/unhide', messageActionSchema, async (request, reply) => {
+    await messageController.unhideMessage(request as any, reply);
+  });
+
+  fastify.post('/messages/:messageId/pin', messageActionSchema, async (request, reply) => {
+    await messageController.pinMessage(request as any, reply);
+  });
+
+  fastify.post('/messages/:messageId/unpin', messageActionSchema, async (request, reply) => {
+    await messageController.unpinMessage(request as any, reply);
+  });
 };
 
 export default routes;
