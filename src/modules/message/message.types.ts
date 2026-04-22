@@ -5,6 +5,7 @@ export interface SendMessageInput {
   type?: string;
   attachments?: any[];
   metadata?: any;
+  mentions?: string[];
 }
 
 export type CreateMessageInput = SendMessageInput;
@@ -17,6 +18,9 @@ export interface MessageEntity {
   type: string;
   attachments?: any[];
   metadata?: any;
+  mentions?: string[];
+  hiddenBy?: string[];
+  isPinned?: boolean;
   reactions?: Record<string, string[]>;
   seenBy: string[];
   createdAt: Date;
@@ -31,6 +35,9 @@ export interface MessageDTO {
   type: string;
   attachments?: any[];
   metadata?: any;
+  mentions?: string[];
+  hiddenBy?: string[];
+  isPinned?: boolean;
   reactions?: Record<string, string[]>;
   seenBy: string[];
   createdAt: string;
