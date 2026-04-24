@@ -10,6 +10,8 @@ const MessageRequestBody = {
     senderId: { type: 'string' },
     content: { type: 'string' },
     mentions: { type: 'array', items: { type: 'string' }, nullable: true },
+    replyTo: { type: 'string', nullable: true },
+    forwardedFrom: { type: 'string', nullable: true },
   },
 };
 
@@ -28,6 +30,23 @@ const MessageResponse = {
     mentions: { type: 'array', items: { type: 'string' }, nullable: true },
     hiddenBy: { type: 'array', items: { type: 'string' }, nullable: true },
     isPinned: { type: 'boolean', nullable: true },
+    replyTo: { type: 'string', nullable: true },
+    forwardedFrom: { type: 'string', nullable: true },
+    isDeleted: { type: 'boolean', nullable: true },
+    deletedBy: { type: 'string', nullable: true },
+    deletedAt: { type: 'string', format: 'date-time', nullable: true },
+    editedAt: { type: 'string', format: 'date-time', nullable: true },
+    editHistory: { 
+      type: 'array', 
+      items: { 
+        type: 'object', 
+        properties: { 
+          content: { type: 'string' }, 
+          editedAt: { type: 'string', format: 'date-time' } 
+        } 
+      }, 
+      nullable: true 
+    },
     createdAt: { type: 'string', format: 'date-time' },
     updatedAt: { type: 'string', format: 'date-time', nullable: true },
   },
@@ -497,6 +516,74 @@ const routes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/messages/:messageId/unpin', messageActionSchema, async (request, reply) => {
     await messageController.unpinMessage(request as any, reply);
   });
+
+  fastify.patch(
+    '/messages/:messageId',
+    {
+      schema: {
+        summary: 'Edit a message',
+        tags: ['messages'],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['messageId'],
+          properties: { messageId: { type: 'string' } },
+        },
+        body: {
+          type: 'object',
+          required: ['content', 'conversationId'],
+          properties: {
+            content: { type: 'string' },
+            conversationId: { type: 'string' },
+          },
+        },
+        response: {
+          200: MessageResponse,
+          400: ErrorResponse,
+          401: ErrorResponse,
+          500: ErrorResponse,
+        },
+      },
+      preHandler: fastify.authenticate,
+    },
+    async (request, reply) => {
+      await messageController.editMessage(request as any, reply);
+    },
+  );
+
+  fastify.delete(
+    '/messages/:messageId',
+    {
+      schema: {
+        summary: 'Delete a message',
+        tags: ['messages'],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['messageId'],
+          properties: { messageId: { type: 'string' } },
+        },
+        querystring: {
+          type: 'object',
+          required: ['conversationId'],
+          properties: {
+            conversationId: { type: 'string' },
+            mode: { type: 'string', enum: ['self', 'everyone'], default: 'self' },
+          },
+        },
+        response: {
+          200: { type: 'object', properties: { success: { type: 'boolean' } } },
+          400: ErrorResponse,
+          401: ErrorResponse,
+          500: ErrorResponse,
+        },
+      },
+      preHandler: fastify.authenticate,
+    },
+    async (request, reply) => {
+      await messageController.deleteMessage(request as any, reply);
+    },
+  );
 };
 
 export default routes;

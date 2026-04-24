@@ -32,6 +32,10 @@ export interface IMessageRepository {
   pinMessage(messageId: string): Promise<void>;
 
   unpinMessage(messageId: string): Promise<void>;
+
+  update(messageId: string, data: Partial<MessageEntity>): Promise<MessageDTO | null>;
+
+  deleteForEveryone(messageId: string, userId: string): Promise<MessageDTO | null>;
 }
 
 export interface IConversationRepository {
