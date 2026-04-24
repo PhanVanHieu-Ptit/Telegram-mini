@@ -13,6 +13,15 @@ const MessageSchema = new Schema<MessageDocument>({
   seenBy: { type: [String], default: [] },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date },
+
+  // New fields
+  replyTo: { type: String },
+  forwardedFrom: { type: String },
+  isDeleted: { type: Boolean, default: false },
+  deletedBy: { type: String },
+  deletedAt: { type: Date },
+  editedAt: { type: Date },
+  editHistory: { type: [{ content: String, editedAt: Date }], default: [] },
 });
 
 MessageSchema.index({ conversationId: 1, createdAt: 1 });
@@ -51,11 +60,22 @@ export class MongoMessageRepository implements IMessageRepository {
       seenBy: doc.seenBy,
       createdAt: doc.createdAt.toISOString(),
       updatedAt: doc.updatedAt?.toISOString(),
+
+      replyTo: doc.replyTo,
+      forwardedFrom: doc.forwardedFrom,
+      isDeleted: doc.isDeleted,
+      deletedBy: doc.deletedBy,
+      deletedAt: doc.deletedAt?.toISOString(),
+      editedAt: doc.editedAt?.toISOString(),
+      editHistory: doc.editHistory?.map(h => ({
+        content: h.content,
+        editedAt: h.editedAt.toISOString()
+      })),
     };
   }
 
   async create(
-    data: Pick<MessageEntity, "conversationId" | "senderId" | "content"> & Partial<Pick<MessageEntity, "type" | "seenBy" | "attachments" | "metadata" | "mentions" | "hiddenBy" | "isPinned">>
+    data: Pick<MessageEntity, "conversationId" | "senderId" | "content"> & Partial<Pick<MessageEntity, "type" | "seenBy" | "attachments" | "metadata" | "mentions" | "hiddenBy" | "isPinned" | "replyTo" | "forwardedFrom">>
   ): Promise<MessageDTO> {
     const created = await this.messageModel.create({
       conversationId: data.conversationId,
@@ -69,6 +89,8 @@ export class MongoMessageRepository implements IMessageRepository {
       isPinned: data.isPinned || false,
       reactions: {},
       seenBy: data.seenBy || [],
+      replyTo: data.replyTo,
+      forwardedFrom: data.forwardedFrom,
     });
     return this.mapMessage(created);
   }
@@ -184,6 +206,27 @@ export class MongoMessageRepository implements IMessageRepository {
     await this.messageModel.findByIdAndUpdate(messageId, {
       isPinned: false
     }).exec();
+  }
+
+  async update(messageId: string, data: Partial<MessageEntity>): Promise<MessageDTO | null> {
+    const doc = await this.messageModel.findByIdAndUpdate(messageId, { $set: data }, { new: true }).exec();
+    if (!doc) return null;
+    return this.mapMessage(doc);
+  }
+
+  async deleteForEveryone(messageId: string, userId: string): Promise<MessageDTO | null> {
+    const doc = await this.messageModel.findByIdAndUpdate(messageId, {
+      $set: {
+        isDeleted: true,
+        deletedBy: userId,
+        deletedAt: new Date(),
+        content: "This message was deleted",
+        attachments: [],
+        metadata: null
+      }
+    }, { new: true }).exec();
+    if (!doc) return null;
+    return this.mapMessage(doc);
   }
 }
 

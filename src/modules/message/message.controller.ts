@@ -38,7 +38,7 @@ export class MessageController {
     request: FastifyRequestWithIO<CreateMessageBody>,
     reply: FastifyReply,
   ): Promise<void> {
-    const { conversationId, senderId, content, type, attachments, metadata } = request.body ?? {};
+    const { conversationId, senderId, content, type, attachments, metadata, replyTo, forwardedFrom } = request.body ?? {};
 
     if (!conversationId || !senderId || !content) {
       void reply.code(400).send({
@@ -54,7 +54,9 @@ export class MessageController {
         content,
         type,
         attachments,
-        metadata
+        metadata,
+        replyTo,
+        forwardedFrom,
       });
 
       await reply.code(200).send(message);
@@ -274,6 +276,9 @@ export class MessageController {
            lastMessage: message,
         }).catch(err => console.error("Failed to publish mqtt event", err));
       }
+    }
+  }
+
   async searchMessages(
     request: FastifyRequest<{ Querystring: any }>,
     reply: FastifyReply,
@@ -380,6 +385,56 @@ export class MessageController {
     try {
       await this.service.unpinMessage(conversationId, messageId, userId);
       void reply.code(200).send({ success: true });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
+    }
+  }
+
+  async editMessage(
+    request: FastifyRequest<{ Params: { messageId: string }; Body: { content: string; conversationId: string } }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const { messageId } = request.params;
+    const { content, conversationId } = request.body ?? {};
+    const authenticatedUser = (request as any).user;
+    const userId = authenticatedUser?.userId;
+
+    if (!userId) return void reply.code(401).send({ error: "Unauthorized" });
+    if (!content || !conversationId) return void reply.code(400).send({ error: "content and conversationId are required" });
+
+    try {
+      const message = await this.service.editMessage(conversationId, messageId, userId, content);
+      void reply.code(200).send(message);
+
+      if (request.server.io) {
+        request.server.io.emit("message:updated", message);
+      }
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
+    }
+  }
+
+  async deleteMessage(
+    request: FastifyRequest<{ Params: { messageId: string }; Querystring: { conversationId: string, mode?: 'self' | 'everyone' } }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const { messageId } = request.params;
+    const { conversationId, mode = 'self' } = request.query ?? {};
+    const authenticatedUser = (request as any).user;
+    const userId = authenticatedUser?.userId;
+
+    if (!userId) return void reply.code(401).send({ error: "Unauthorized" });
+    if (!conversationId) return void reply.code(400).send({ error: "conversationId is required" });
+
+    try {
+      await this.service.deleteMessage(conversationId, messageId, userId, mode);
+      void reply.code(200).send({ success: true });
+
+      if (mode === 'everyone' && request.server.io) {
+        request.server.io.emit("message:deleted", { messageId, conversationId });
+      }
     } catch (err: any) {
       const statusCode = err.statusCode || 500;
       void reply.code(statusCode).send({ error: (err as Error).message });

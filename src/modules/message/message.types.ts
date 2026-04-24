@@ -6,6 +6,8 @@ export interface SendMessageInput {
   attachments?: any[];
   metadata?: any;
   mentions?: string[];
+  replyTo?: string;
+  forwardedFrom?: string;
 }
 
 export type CreateMessageInput = SendMessageInput;
@@ -25,6 +27,15 @@ export interface MessageEntity {
   seenBy: string[];
   createdAt: Date;
   updatedAt?: Date;
+
+  // New fields
+  replyTo?: string; // messageId
+  forwardedFrom?: string; // original messageId or senderId? Let's use original messageId for now
+  isDeleted?: boolean;
+  deletedBy?: string;
+  deletedAt?: Date;
+  editedAt?: Date;
+  editHistory?: { content: string; editedAt: Date }[];
 }
 
 export interface MessageDTO {
@@ -42,6 +53,15 @@ export interface MessageDTO {
   seenBy: string[];
   createdAt: string;
   updatedAt?: string;
+
+  // New fields
+  replyTo?: string;
+  forwardedFrom?: string;
+  isDeleted?: boolean;
+  deletedBy?: string;
+  deletedAt?: string;
+  editedAt?: string;
+  editHistory?: { content: string; editedAt: string }[];
 }
 
 export interface ConversationDTO {

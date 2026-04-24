@@ -37,6 +37,8 @@ export class MessageService {
       attachments: input.attachments,
       metadata: input.metadata,
       mentions: input.mentions,
+      replyTo: input.replyTo,
+      forwardedFrom: input.forwardedFrom,
     });
 
     // Cập nhật last_message_id và updated_at cho conversation
@@ -53,6 +55,67 @@ export class MessageService {
 
     // 4. Trả về ngay lập tức
     return message;
+  }
+
+  async editMessage(conversationId: string, messageId: string, userId: string, content: string): Promise<MessageDTO> {
+    const message = await this.messageRepository.findById(messageId);
+    if (!message) throw new ValidationError("Message not found");
+    if (message.senderId !== userId) throw new UnauthorizedError("You can only edit your own messages");
+    if (message.isDeleted) throw new ValidationError("Cannot edit a deleted message");
+
+    // Optional time limit for editing (e.g., 15 minutes)
+    const createdAt = new Date(message.createdAt);
+    const now = new Date();
+    const diffMs = now.getTime() - createdAt.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins > 15) {
+      throw new ValidationError("Editing time limit (15 minutes) exceeded");
+    }
+
+    const editHistory = message.editHistory || [];
+    editHistory.push({
+      content: message.content,
+      editedAt: message.editedAt ? new Date(message.editedAt) : new Date(message.createdAt)
+    });
+
+    const updatedMessage = await this.messageRepository.update(messageId, {
+      content,
+      editedAt: new Date(),
+      editHistory: editHistory as any
+    });
+
+    if (!updatedMessage) throw new ValidationError("Failed to update message");
+
+    // Notify via MQTT
+    this.publishMqtt(conversationId, { ...updatedMessage, eventType: 'MESSAGE_EDITED' }).catch(console.error);
+
+    return updatedMessage;
+  }
+
+  async deleteMessage(conversationId: string, messageId: string, userId: string, mode: 'self' | 'everyone'): Promise<void> {
+    const message = await this.messageRepository.findById(messageId);
+    if (!message) throw new ValidationError("Message not found");
+
+    if (mode === 'everyone') {
+      if (message.senderId !== userId) throw new UnauthorizedError("You can only delete your own messages for everyone");
+      
+      // Optional time limit for "delete for everyone" (e.g., 2 hours or same as edit)
+      const createdAt = new Date(message.createdAt);
+      const now = new Date();
+      const diffMs = now.getTime() - createdAt.getTime();
+      const diffHours = Math.floor(diffMs / 3600000);
+      if (diffHours > 24) { // Let's say 24 hours for deletion
+        throw new ValidationError("Deletion time limit (24 hours) exceeded");
+      }
+
+      const deletedMessage = await this.messageRepository.deleteForEveryone(messageId, userId);
+      if (deletedMessage) {
+        this.publishMqtt(conversationId, { ...deletedMessage, eventType: 'MESSAGE_DELETED' }).catch(console.error);
+      }
+    } else {
+      // Delete for self
+      await this.messageRepository.hideMessage(messageId, userId);
+    }
   }
 
   // Tách ra các hàm private để code sạch hơn
