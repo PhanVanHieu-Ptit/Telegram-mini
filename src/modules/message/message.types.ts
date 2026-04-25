@@ -34,6 +34,7 @@ export interface MessageEntity {
   isDeleted?: boolean;
   deletedBy?: string;
   deletedAt?: Date;
+  deletedForUsers?: string[];
   editedAt?: Date;
   editHistory?: { content: string; editedAt: Date }[];
 }
@@ -60,6 +61,7 @@ export interface MessageDTO {
   isDeleted?: boolean;
   deletedBy?: string;
   deletedAt?: string;
+  deletedForUsers?: string[];
   editedAt?: string;
   editHistory?: { content: string; editedAt: string }[];
 }
