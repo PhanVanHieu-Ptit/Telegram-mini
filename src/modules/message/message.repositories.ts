@@ -8,12 +8,12 @@ import type {
 
 export interface IMessageRepository {
   create(
-    data: Pick<MessageEntity, "conversationId" | "senderId" | "content"> & Partial<Pick<MessageEntity, "type" | "seenBy" | "attachments" | "metadata" | "reactions" | "mentions" | "hiddenBy" | "isPinned">>,
+    data: Pick<MessageEntity, "conversationId" | "senderId" | "content"> & Partial<Pick<MessageEntity, "type" | "seenBy" | "attachments" | "metadata" | "reactions" | "mentions" | "hiddenBy" | "isPinned" | "replyTo" | "forwardedFrom">>,
   ): Promise<MessageDTO>;
 
   findById(id: string): Promise<MessageDTO | null>;
 
-  findByConversationId(conversationId: string): Promise<MessageDTO[]>;
+  findByConversationId(conversationId: string, userId?: string): Promise<MessageDTO[]>;
 
   deleteById(id: string): Promise<void>;
 
@@ -25,7 +25,7 @@ export interface IMessageRepository {
 
   searchMessages(query: any): Promise<MessageDTO[]>;
 
-  hideMessage(messageId: string, userId: string): Promise<void>;
+  hideMessage(messageId: string, userId: string | string[]): Promise<void>;
 
   unhideMessage(messageId: string, userId: string): Promise<void>;
 
@@ -36,6 +36,8 @@ export interface IMessageRepository {
   update(messageId: string, data: Partial<MessageEntity>): Promise<MessageDTO | null>;
 
   deleteForEveryone(messageId: string, userId: string): Promise<MessageDTO | null>;
+  
+  deleteForMe(messageId: string, userId: string): Promise<void>;
 }
 
 export interface IConversationRepository {

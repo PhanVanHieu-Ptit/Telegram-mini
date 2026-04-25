@@ -20,13 +20,13 @@ const MessageSchema = new Schema<MessageDocument>({
   isDeleted: { type: Boolean, default: false },
   deletedBy: { type: String },
   deletedAt: { type: Date },
+  deletedForUsers: { type: [String], default: [] },
   editedAt: { type: Date },
   editHistory: { type: [{ content: String, editedAt: Date }], default: [] },
 });
 
 MessageSchema.index({ conversationId: 1, createdAt: 1 });
 MessageSchema.index({ content: "text" });
-MessageSchema.index({ senderId: 1 });
 MessageSchema.index({ type: 1 });
 
 export const MessageModel = mongoose.models.Message || mongoose.model<MessageDocument>("Message", MessageSchema);
@@ -71,6 +71,7 @@ export class MongoMessageRepository implements IMessageRepository {
         content: h.content,
         editedAt: h.editedAt.toISOString()
       })),
+      deletedForUsers: doc.deletedForUsers,
     };
   }
 
@@ -101,9 +102,13 @@ export class MongoMessageRepository implements IMessageRepository {
     return this.mapMessage(doc);
   }
 
-  async findByConversationId(conversationId: string): Promise<MessageDTO[]> {
+  async findByConversationId(conversationId: string, userId?: string): Promise<MessageDTO[]> {
+    const filter: any = { conversationId };
+    if (userId) {
+      filter.deletedForUsers = { $ne: userId };
+    }
     const docs = await this.messageModel
-      .find({ conversationId })
+      .find(filter)
       .sort({ createdAt: 1 })
       .exec();
     return docs.map((doc) => this.mapMessage(doc));
@@ -184,9 +189,10 @@ export class MongoMessageRepository implements IMessageRepository {
     return docs.map((doc) => this.mapMessage(doc));
   }
 
-  async hideMessage(messageId: string, userId: string): Promise<void> {
+  async hideMessage(messageId: string, userId: string | string[]): Promise<void> {
+    const userIds = Array.isArray(userId) ? userId : [userId];
     await this.messageModel.findByIdAndUpdate(messageId, {
-      $addToSet: { hiddenBy: userId }
+      $addToSet: { hiddenBy: { $each: userIds } }
     }).exec();
   }
 
@@ -220,13 +226,19 @@ export class MongoMessageRepository implements IMessageRepository {
         isDeleted: true,
         deletedBy: userId,
         deletedAt: new Date(),
-        content: "This message was deleted",
+        content: "",
         attachments: [],
         metadata: null
       }
     }, { new: true }).exec();
     if (!doc) return null;
     return this.mapMessage(doc);
+  }
+  
+  async deleteForMe(messageId: string, userId: string): Promise<void> {
+    await this.messageModel.findByIdAndUpdate(messageId, {
+      $addToSet: { deletedForUsers: userId }
+    }).exec();
   }
 }
 

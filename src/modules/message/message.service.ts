@@ -75,7 +75,7 @@ export class MessageService {
     const editHistory = message.editHistory || [];
     editHistory.push({
       content: message.content,
-      editedAt: message.editedAt ? new Date(message.editedAt) : new Date(message.createdAt)
+      editedAt: message.editedAt || message.createdAt
     });
 
     const updatedMessage = await this.messageRepository.update(messageId, {
@@ -114,7 +114,7 @@ export class MessageService {
       }
     } else {
       // Delete for self
-      await this.messageRepository.hideMessage(messageId, userId);
+      await this.messageRepository.deleteForMe(messageId, userId);
     }
   }
 
@@ -195,7 +195,7 @@ export class MessageService {
       throw new UnauthorizedError("User is not a member of this conversation");
     }
 
-    return this.messageRepository.findByConversationId(conversationId);
+    return this.messageRepository.findByConversationId(conversationId, userId);
   }
 
   async typing(conversationId: string, userId: string, isTyping: boolean): Promise<void> {
@@ -247,7 +247,7 @@ export class MessageService {
     await this.conversationRepository.resetUnread(conversationId, userId);
 
     // Get the last message to include messageId in seen event
-    const messages = await this.messageRepository.findByConversationId(conversationId);
+    const messages = await this.messageRepository.findByConversationId(conversationId, userId);
     const lastMessage = messages && messages.length > 0 ? messages[messages.length - 1] : null;
 
     // Publish seen event
@@ -325,7 +325,20 @@ export class MessageService {
   async hideMessage(conversationId: string, messageId: string, userId: string): Promise<void> {
     const isMember = await this.conversationRepository.isMember(conversationId, userId);
     if (!isMember) throw new UnauthorizedError("User is not a member of this conversation");
-    await this.messageRepository.hideMessage(messageId, userId);
+    
+    const message = await this.messageRepository.findById(messageId);
+    if (!message) throw new UnauthorizedError("Message not found");
+
+    if (message.senderId === userId) {
+      // Own message: Hide for everyone
+      const memberIds = await this.conversationRepository.getMemberIds(conversationId);
+      if (memberIds.length > 0) {
+        await this.messageRepository.hideMessage(messageId, memberIds);
+      }
+    } else {
+      // Others' message: Hide for self only
+      await this.messageRepository.hideMessage(messageId, userId);
+    }
   }
 
   async unhideMessage(conversationId: string, messageId: string, userId: string): Promise<void> {

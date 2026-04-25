@@ -38,11 +38,18 @@ export class MessageController {
     request: FastifyRequestWithIO<CreateMessageBody>,
     reply: FastifyReply,
   ): Promise<void> {
-    const { conversationId, senderId, content, type, attachments, metadata, replyTo, forwardedFrom } = request.body ?? {};
+    const { conversationId, content, type, attachments, metadata, replyTo, forwardedFrom } = request.body ?? {};
+    const authenticatedUser = (request as any).user;
+    const currentUserId = authenticatedUser?.userId;
 
-    if (!conversationId || !senderId || !content) {
+    if (!currentUserId) {
+      void reply.code(401).send({ error: "Unauthorized" });
+      return;
+    }
+
+    if (!conversationId || !content) {
       void reply.code(400).send({
-        error: "conversationId, senderId and content are required",
+        error: "conversationId and content are required",
       });
       return;
     }
@@ -50,7 +57,7 @@ export class MessageController {
     try {
       const message: MessageDTO = await this.service.sendMessage({ 
         conversationId, 
-        senderId, 
+        senderId: currentUserId, 
         content,
         type,
         attachments,
