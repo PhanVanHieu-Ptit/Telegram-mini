@@ -408,7 +408,7 @@ export class MessageController {
     const userId = authenticatedUser?.userId;
 
     if (!userId) return void reply.code(401).send({ error: "Unauthorized" });
-    if (!content || !conversationId) return void reply.code(400).send({ error: "content and conversationId are required" });
+    if (content === undefined || conversationId === undefined) return void reply.code(400).send({ error: "content and conversationId are required" });
 
     try {
       const message = await this.service.editMessage(conversationId, messageId, userId, content);

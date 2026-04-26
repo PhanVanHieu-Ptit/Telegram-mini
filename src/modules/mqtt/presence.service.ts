@@ -5,6 +5,7 @@ export interface PresenceState {
     userId: string;
     online: boolean;
     lastSeen: Date;
+    activeConversationId?: string;
 }
 
 /**
@@ -34,11 +35,12 @@ export class PresenceService {
     /**
      * Mark a user as online
      */
-    markOnline(userId: string): void {
+    markOnline(userId: string, activeConversationId?: string): void {
         this.presenceMap.set(userId, {
             userId,
             online: true,
             lastSeen: new Date(),
+            activeConversationId,
         });
     }
 
@@ -67,6 +69,13 @@ export class PresenceService {
      */
     getPresence(userId: string): PresenceState | undefined {
         return this.presenceMap.get(userId);
+    }
+
+    /**
+     * Get the active conversation ID for a user
+     */
+    getActiveConversation(userId: string): string | undefined {
+        return this.presenceMap.get(userId)?.activeConversationId;
     }
 
     /**
@@ -135,9 +144,15 @@ export class PresenceService {
             }
 
             const userId = matches[1];
+            
+            let activeConversationId: string | undefined;
+            if (message && message.length > 0) {
+                const payload = JSON.parse(message.toString());
+                activeConversationId = payload.activeConversationId;
+            }
 
             // Mark user as online and update lastSeen
-            this.markOnline(userId);
+            this.markOnline(userId, activeConversationId);
         } catch (error) {
             console.error("Error handling heartbeat:", error);
         }
