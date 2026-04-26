@@ -3,7 +3,7 @@ import { TokenService } from "./token.service";
 import { SendNotificationPayload, SendNotificationToMultipleUsersPayload } from "./notification.types";
 
 export class NotificationService {
-  constructor(private tokenService: TokenService) {}
+  constructor(private tokenService: TokenService) { }
 
   async getTokenCount(userId: string): Promise<number> {
     const tokens = await this.tokenService.getTokensByUserId(userId);
@@ -27,15 +27,32 @@ export class NotificationService {
     return this.sendToTokens(tokens, title, body, data);
   }
 
-  async sendToMultipleUsers(payload: SendNotificationToMultipleUsersPayload): Promise<{ success: number; failure: number }> {
-    const { userIds, title, body, data } = payload;
-    
-    // Get all tokens for all users
+  async sendToMultipleUsers(payload: SendNotificationToMultipleUsersPayload & { excludeUserId?: string }): Promise<{ success: number; failure: number }> {
+    const { userIds, title, body, data, excludeUserId } = payload;
+
+    if (userIds.length === 0 || !messaging) {
+      return { success: 0, failure: 0 };
+    }
+
+    // 1. Get tokens to exclude (the sender's tokens)
+    const excludedTokens = new Set<string>();
+    if (excludeUserId) {
+      try {
+        const senderTokens = await this.tokenService.getTokensByUserId(excludeUserId);
+        senderTokens.forEach(t => excludedTokens.add(t));
+      } catch (err) {
+        console.error("[NotificationService] Error fetching excluded tokens:", err);
+      }
+    }
+
+    // 2. Get all tokens for all target users
     const allTokensPromises = userIds.map(userId => this.tokenService.getTokensByUserId(userId));
     const tokenArrays = await Promise.all(allTokensPromises);
-    const tokens = tokenArrays.flat();
+    
+    // 3. Flatten and filter out any excluded tokens
+    const tokens = tokenArrays.flat().filter(t => !excludedTokens.has(t));
 
-    if (tokens.length === 0 || !messaging) {
+    if (tokens.length === 0) {
       return { success: 0, failure: 0 };
     }
 
@@ -56,13 +73,13 @@ export class NotificationService {
 
     try {
       const response = await messaging.sendEachForMulticast(message);
-      
+
       const invalidTokens: string[] = [];
       response.responses.forEach((res, index) => {
         if (!res.success) {
           const error = res.error;
-          if (error?.code === 'messaging/invalid-registration-token' || 
-              error?.code === 'messaging/registration-token-not-registered') {
+          if (error?.code === 'messaging/invalid-registration-token' ||
+            error?.code === 'messaging/registration-token-not-registered') {
             invalidTokens.push(tokens[index]);
           }
         }

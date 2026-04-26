@@ -8,6 +8,7 @@ import { ValidationError, UnauthorizedError } from "../../core/errors/AppError";
 import { MqttTopics } from "../mqtt/mqtt.topics";
 import type { NotificationService } from "../notifications/notification.service";
 import type { UserService } from "../user/user.service";
+import { presenceService } from "../mqtt/presence.service";
 
 export class MessageService {
   constructor(
@@ -68,8 +69,8 @@ export class MessageService {
     const now = new Date();
     const diffMs = now.getTime() - createdAt.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins > 15) {
-      throw new ValidationError("Editing time limit (15 minutes) exceeded");
+    if (diffMins > 1440) { // 24 hours
+      throw new ValidationError("Editing time limit (24 hours) exceeded");
     }
 
     const editHistory = message.editHistory || [];
@@ -98,7 +99,7 @@ export class MessageService {
 
     if (mode === 'everyone') {
       if (message.senderId !== userId) throw new UnauthorizedError("You can only delete your own messages for everyone");
-      
+
       // Optional time limit for "delete for everyone" (e.g., 2 hours or same as edit)
       const createdAt = new Date(message.createdAt);
       const now = new Date();
@@ -134,13 +135,32 @@ export class MessageService {
       this.conversationRepository.getMemberIds(input.conversationId),
     ]);
 
-    const recipientIds = memberIds.filter((id) => id !== input.senderId);
+    const recipientIds = memberIds.filter((id) => {
+      const senderIdStr = String(input.senderId).trim().toLowerCase();
+      const currentIdStr = String(id).trim().toLowerCase();
+
+      if (currentIdStr === senderIdStr) return false;
+
+      // Don't send push notification if user is currently viewing this conversation
+      const activeConvId = presenceService.getActiveConversation(id);
+      if (activeConvId && String(activeConvId).toLowerCase() === String(input.conversationId).toLowerCase()) {
+        return false;
+      }
+
+      return true;
+    });
+
     if (recipientIds.length > 0) {
       await this.notificationService.sendToMultipleUsers({
         userIds: recipientIds,
+        excludeUserId: input.senderId, // Absolute fail-safe: never notify the sender
         title: sender?.displayName || "New Message",
         body: input.content,
-        data: { /* ... */ },
+        data: {
+          conversationId: input.conversationId,
+          senderId: input.senderId,
+          type: message.type,
+        },
       });
     }
   }
@@ -325,7 +345,7 @@ export class MessageService {
   async hideMessage(conversationId: string, messageId: string, userId: string): Promise<void> {
     const isMember = await this.conversationRepository.isMember(conversationId, userId);
     if (!isMember) throw new UnauthorizedError("User is not a member of this conversation");
-    
+
     const message = await this.messageRepository.findById(messageId);
     if (!message) throw new UnauthorizedError("Message not found");
 
@@ -351,7 +371,7 @@ export class MessageService {
     const isMember = await this.conversationRepository.isMember(conversationId, userId);
     if (!isMember) throw new UnauthorizedError("User is not a member of this conversation");
     await this.messageRepository.pinMessage(messageId);
-    
+
     // Notify via MQTT
     const message = await this.messageRepository.findById(messageId);
     if (message && this.mqttService) {
@@ -366,7 +386,7 @@ export class MessageService {
     const isMember = await this.conversationRepository.isMember(conversationId, userId);
     if (!isMember) throw new UnauthorizedError("User is not a member of this conversation");
     await this.messageRepository.unpinMessage(messageId);
-    
+
     // Notify via MQTT
     const message = await this.messageRepository.findById(messageId);
     if (message && this.mqttService) {
