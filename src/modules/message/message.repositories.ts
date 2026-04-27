@@ -75,5 +75,9 @@ export interface IConversationRepository {
   deleteConversation(conversationId: string): Promise<void>;
 
   getMemberRole(conversationId: string, userId: string): Promise<string | null>;
+
+  findPrivateConversation(userIds: string[]): Promise<ConversationDTO | null>;
+  
+  getConversationListItem(conversationId: string, userId: string): Promise<ConversationListItemDTO | null>;
 }
 

@@ -447,6 +447,28 @@ export class MessageController {
       void reply.code(statusCode).send({ error: (err as Error).message });
     }
   }
+
+  async getSavedMessages(
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const authenticatedUser = (request as any).user;
+    const userId = authenticatedUser?.userId;
+
+    if (!userId) {
+      void reply.code(401).send({ error: "Unauthorized" });
+      return;
+    }
+
+    try {
+      const conversation = await this.service.getOrCreateSavedMessages(userId);
+      void reply.code(200).send(conversation);
+    } catch (err: any) {
+      console.error("[MessageController] getSavedMessages error:", err);
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
+    }
+  }
 }
 import { PostgresConversationRepository } from "./postgres-conversation.repository";
 import { MongoMessageRepository, MessageModel } from "./mongo-message.repository";
