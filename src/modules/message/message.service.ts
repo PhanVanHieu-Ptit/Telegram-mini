@@ -396,4 +396,33 @@ export class MessageService {
       ).catch(console.error);
     }
   }
+
+  async getOrCreateSavedMessages(userId: string) {
+    try {
+      if (!userId?.trim()) {
+        throw new ValidationError("userId is required");
+      }
+
+      let conversation = await this.conversationRepository.findPrivateConversation([userId]);
+      
+      if (!conversation) {
+        conversation = await this.conversationRepository.createConversation({
+          userIds: [userId],
+          type: "private",
+          name: "Saved Messages",
+          createdBy: userId,
+        });
+      }
+
+      const fullDetails = await this.conversationRepository.getConversationListItem(conversation.id, userId);
+      if (!fullDetails) {
+        throw new Error(`Failed to fetch conversation details for id ${conversation.id} and user ${userId}`);
+      }
+      
+      return fullDetails;
+    } catch (error) {
+      console.error("[MessageService] getOrCreateSavedMessages error:", error);
+      throw error;
+    }
+  }
 }

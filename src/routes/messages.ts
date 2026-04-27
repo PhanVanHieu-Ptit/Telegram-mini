@@ -209,6 +209,27 @@ const routes: FastifyPluginAsync = async (fastify) => {
       await messageController.joinConversation(request as any, reply);
     },
   );
+
+  // Get or create saved messages conversation
+  fastify.get(
+    '/conversations/saved',
+    {
+      schema: {
+        summary: 'Get or create Saved Messages conversation',
+        tags: ['conversations'],
+        security: [{ bearerAuth: [] }],
+        response: {
+          200: ConversationResponse,
+          401: ErrorResponse,
+          500: ErrorResponse,
+        },
+      },
+      preHandler: fastify.authenticate,
+    },
+    async (request, reply) => {
+      await messageController.getSavedMessages(request as any, reply);
+    },
+  );
  
   // Delete conversation endpoint
   fastify.delete(

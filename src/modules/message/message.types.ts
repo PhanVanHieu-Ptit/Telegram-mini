@@ -87,6 +87,7 @@ export interface ConversationMember {
 
 export interface ConversationListItemDTO {
   id: string;
+  type: 'private' | 'group';
   participantIds: string[];
   members: ConversationMember[];
   lastMessage?: MessageDTO;

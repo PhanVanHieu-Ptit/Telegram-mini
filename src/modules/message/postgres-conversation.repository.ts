@@ -175,6 +175,7 @@ export class PostgresConversationRepository implements IConversationRepository {
       }
 
       await client.query("COMMIT");
+      console.log(`[PostgresRepo] createConversation success: ${conversation.id}`);
 
       return {
         id: conversation.id,
@@ -186,6 +187,7 @@ export class PostgresConversationRepository implements IConversationRepository {
         updatedAt: conversation.updated_at?.toISOString(),
       };
     } catch (error) {
+      console.error("[PostgresRepo] createConversation error:", error);
       await client.query("ROLLBACK");
       throw error;
     } finally {
@@ -197,23 +199,25 @@ export class PostgresConversationRepository implements IConversationRepository {
     try {
       const result = await pgPool.query<{
         id: string;
+        type: 'private' | 'group';
         participant_ids: string;
         members_json: string;
         unread_count: number;
         pinned: boolean;
         muted: boolean;
         updated_at: Date;
-        name: string
+        name: string;
         last_message_id: string | null;
       }>(
         `
           SELECT
             c.id,
+            c.type,
             string_agg(DISTINCT cm.user_id::text, ',') as participant_ids,
             json_agg(
               json_build_object(
                 'id', u.id,
-                'fullName', COALESCE(u.username, ''),
+                'fullName', COALESCE(u.display_name, u.username, ''),
                 'avatarUrl', u.avatar,
                 'email', u.email,
                 'role', cm.role
@@ -232,7 +236,7 @@ export class PostgresConversationRepository implements IConversationRepository {
             ON u.id = cm.user_id
           INNER JOIN conversation_members cm_user
             ON cm_user.conversation_id = c.id AND cm_user.user_id = $1::uuid
-          GROUP BY c.id, c.updated_at, c.last_message_id, cm_user.unread_count, cm_user.pinned, cm_user.muted
+          GROUP BY c.id, c.type, c.updated_at, c.last_message_id, cm_user.unread_count, cm_user.pinned, cm_user.muted
           ORDER BY COALESCE(c.updated_at, c.created_at) DESC
         `,
         [userId],
@@ -270,6 +274,7 @@ export class PostgresConversationRepository implements IConversationRepository {
 
         conversations.push({
           id: row.id,
+          type: row.type,
           participantIds,
           members,
           lastMessage,
@@ -346,6 +351,155 @@ export class PostgresConversationRepository implements IConversationRepository {
     }
 
     return result.rows[0].role;
+  }
+
+  async findPrivateConversation(userIds: string[]): Promise<ConversationDTO | null> {
+    try {
+      // If userIds has only one user, it's a "Saved Messages" chat
+      const uniqueUserIds = [...new Set(userIds)];
+      const isSelf = uniqueUserIds.length === 1;
+
+      let query = "";
+      let params: any[] = [];
+
+      if (isSelf) {
+        query = `
+          SELECT c.*
+          FROM conversations c
+          WHERE c.type = 'private'
+            AND EXISTS (
+              SELECT 1 FROM conversation_members cm
+              WHERE cm.conversation_id = c.id
+              GROUP BY cm.conversation_id
+              HAVING COUNT(*) = 1 AND MAX(cm.user_id::text) = $1
+            )
+        `;
+        params = [uniqueUserIds[0]];
+      } else {
+        query = `
+          SELECT c.*
+          FROM conversations c
+          JOIN conversation_members cm1 ON c.id = cm1.conversation_id
+          JOIN conversation_members cm2 ON c.id = cm2.conversation_id
+          WHERE c.type = 'private'
+            AND cm1.user_id = $1::uuid
+            AND cm2.user_id = $2::uuid
+            AND cm1.user_id != cm2.user_id
+            AND (SELECT COUNT(*) FROM conversation_members WHERE conversation_id = c.id) = 2
+        `;
+        params = [uniqueUserIds[0], uniqueUserIds[1]];
+      }
+
+      const result = await pgPool.query<ConversationRow>(query, params);
+
+      if (result.rowCount === 0) {
+        return null;
+      }
+
+      const row = result.rows[0];
+      return {
+        id: row.id,
+        type: row.type,
+        name: row.name,
+        avatar: row.avatar,
+        createdBy: row.created_by,
+        createdAt: row.created_at.toISOString(),
+        updatedAt: row.updated_at?.toISOString(),
+      };
+    } catch (error) {
+      console.error("[PostgresConversationRepository] findPrivateConversation error:", error);
+      throw error;
+    }
+  }
+
+  async getConversationListItem(conversationId: string, userId: string): Promise<ConversationListItemDTO | null> {
+    try {
+      const result = await pgPool.query<{
+        id: string;
+        type: 'private' | 'group';
+        participant_ids: string;
+        members_json: string;
+        unread_count: number;
+        pinned: boolean;
+        muted: boolean;
+        updated_at: Date;
+        name: string;
+        last_message_id: string | null;
+      }>(
+        `
+          SELECT
+            c.id,
+            c.type,
+            string_agg(DISTINCT cm.user_id::text, ',') as participant_ids,
+            json_agg(
+              json_build_object(
+                'id', u.id,
+                'fullName', COALESCE(u.display_name, u.username, ''),
+                'avatarUrl', u.avatar,
+                'email', u.email,
+                'role', cm.role
+              )
+            ) FILTER (WHERE u.id IS NOT NULL)::text as members_json,
+            cm_user.unread_count,
+            cm_user.pinned,
+            cm_user.muted,
+            c.updated_at,
+            c.name,
+            c.last_message_id
+          FROM conversations c
+          INNER JOIN conversation_members cm
+            ON cm.conversation_id = c.id
+          LEFT JOIN users u
+            ON u.id = cm.user_id
+          INNER JOIN conversation_members cm_user
+            ON cm_user.conversation_id = c.id AND cm_user.user_id = $2::uuid
+          WHERE c.id = $1::uuid
+          GROUP BY c.id, c.type, c.updated_at, c.last_message_id, cm_user.unread_count, cm_user.pinned, cm_user.muted
+        `,
+        [conversationId, userId],
+      );
+
+      if (result.rows.length === 0) {
+        console.warn(`[PostgresRepo] getConversationListItem: No rows found for conv ${conversationId} and user ${userId}`);
+        return null;
+      }
+      const row = result.rows[0];
+
+      const participantIds = row.participant_ids ? row.participant_ids.split(',').map(id => id.trim()) : [];
+
+      let members: ConversationMember[] = [];
+      try {
+        if (row.members_json) {
+          const membersData = typeof row.members_json === 'string'
+            ? JSON.parse(row.members_json)
+            : row.members_json;
+          members = Array.isArray(membersData) ? membersData : [];
+        }
+      } catch (error) {
+        console.error('Failed to parse members JSON:', error);
+      }
+
+      let lastMessage: MessageDTO | undefined;
+      if (row.last_message_id) {
+        lastMessage = await this.getLastMessage(row.last_message_id);
+      }
+
+      return {
+        id: row.id,
+        type: row.type,
+        participantIds,
+        members,
+        lastMessage,
+        unreadCount: row.unread_count || 0,
+        pinned: row.pinned || false,
+        muted: row.muted || false,
+        updatedAt: row.updated_at.toISOString(),
+        chatName: row.name || ''
+      };
+    } catch (error) {
+      console.error(`[PostgresRepo] getConversationListItem error for ${conversationId}:`, error);
+      throw error;
+    }
   }
 }
 
