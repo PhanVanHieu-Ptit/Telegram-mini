@@ -79,5 +79,13 @@ export interface IConversationRepository {
   findPrivateConversation(userIds: string[]): Promise<ConversationDTO | null>;
   
   getConversationListItem(conversationId: string, userId: string): Promise<ConversationListItemDTO | null>;
+  
+  pinConversation(conversationId: string, userId: string): Promise<void>;
+  
+  unpinConversation(conversationId: string, userId: string): Promise<void>;
+
+  addMembers(conversationId: string, userIds: string[], role?: string): Promise<void>;
+  
+  removeMember(conversationId: string, userId: string): Promise<void>;
 }
 

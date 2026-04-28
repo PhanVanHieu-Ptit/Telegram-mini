@@ -469,6 +469,95 @@ export class MessageController {
       void reply.code(statusCode).send({ error: (err as Error).message });
     }
   }
+
+  async pinConversation(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const { id: conversationId } = request.params;
+    const authenticatedUser = (request as any).user;
+    const userId = authenticatedUser?.userId;
+
+    if (!userId) {
+      void reply.code(401).send({ error: "Unauthorized" });
+      return;
+    }
+
+    try {
+      await this.service.pinConversation(conversationId, userId);
+      void reply.code(200).send({ success: true });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
+    }
+  }
+
+  async unpinConversation(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const { id: conversationId } = request.params;
+    const authenticatedUser = (request as any).user;
+    const userId = authenticatedUser?.userId;
+
+    if (!userId) {
+      void reply.code(401).send({ error: "Unauthorized" });
+      return;
+    }
+
+    try {
+      await this.service.unpinConversation(conversationId, userId);
+      void reply.code(200).send({ success: true });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
+    }
+  }
+
+  async addMembers(
+    request: FastifyRequest<{ Params: { id: string }; Body: { userIds: string[] } }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const { id: conversationId } = request.params;
+    const { userIds } = request.body ?? {};
+    const authenticatedUser = (request as any).user;
+    const userId = authenticatedUser?.userId;
+
+    if (!userId) {
+      void reply.code(401).send({ error: "Unauthorized" });
+      return;
+    }
+
+    try {
+      await this.service.addMembers(conversationId, userId, userIds);
+      void reply.code(200).send({ success: true });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
+    }
+  }
+
+  async removeMember(
+    request: FastifyRequest<{ Params: { id: string, userId: string } }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const { id: conversationId, userId: targetUserId } = request.params;
+    const authenticatedUser = (request as any).user;
+    const requesterId = authenticatedUser?.userId;
+
+    if (!requesterId) {
+      void reply.code(401).send({ error: "Unauthorized" });
+      return;
+    }
+
+    try {
+      await this.service.removeMember(conversationId, requesterId, targetUserId);
+      void reply.code(200).send({ success: true });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
+    }
+  }
 }
 import { PostgresConversationRepository } from "./postgres-conversation.repository";
 import { MongoMessageRepository, MessageModel } from "./mongo-message.repository";

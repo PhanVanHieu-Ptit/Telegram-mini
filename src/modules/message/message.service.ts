@@ -425,4 +425,107 @@ export class MessageService {
       throw error;
     }
   }
+
+  async pinConversation(conversationId: string, userId: string): Promise<void> {
+    if (!conversationId?.trim()) {
+      throw new ValidationError("conversationId is required");
+    }
+    if (!userId?.trim()) {
+      throw new ValidationError("userId is required");
+    }
+    const isMember = await this.conversationRepository.isMember(conversationId, userId);
+    if (!isMember) {
+      throw new UnauthorizedError("User is not a member of this conversation");
+    }
+    await this.conversationRepository.pinConversation(conversationId, userId);
+  }
+
+  async unpinConversation(conversationId: string, userId: string): Promise<void> {
+    if (!conversationId?.trim()) {
+      throw new ValidationError("conversationId is required");
+    }
+    if (!userId?.trim()) {
+      throw new ValidationError("userId is required");
+    }
+    const isMember = await this.conversationRepository.isMember(conversationId, userId);
+    if (!isMember) {
+      throw new UnauthorizedError("User is not a member of this conversation");
+    }
+    await this.conversationRepository.unpinConversation(conversationId, userId);
+  }
+
+  async addMembers(conversationId: string, requesterId: string, userIds: string[]): Promise<void> {
+    if (!conversationId?.trim() || !requesterId?.trim() || !userIds || userIds.length === 0) {
+      throw new ValidationError("conversationId, requesterId, and userIds are required");
+    }
+    
+    // Validate requester has permission
+    const role = await this.conversationRepository.getMemberRole(conversationId, requesterId);
+    if (!role) {
+      throw new UnauthorizedError("User is not a member of this conversation");
+    }
+    
+    // If it's a group chat, we might want to restrict to owner/admin, but currently we just allow any member to add?
+    // Let's restrict to owner or admin.
+    // However, if the role isn't 'owner' or 'admin', maybe we shouldn't allow it. Let's allow everyone to add for now if not explicitly set, or check type.
+    // For now we will allow members to add or we restrict to owner/admin. Let's assume anyone can add or just owner/admin.
+    // The prompt says "(đối với trưởng nhóm)" which means "for the group owner".
+    if (role !== 'owner' && role !== 'admin') {
+      throw new UnauthorizedError("Only owner or admins can add members");
+    }
+
+    await this.conversationRepository.addMembers(conversationId, userIds);
+
+    // Notify via MQTT
+    const allMembers = await this.conversationRepository.getMemberIds(conversationId);
+    if (this.mqttService) {
+      for (const memberId of allMembers) {
+        this.mqttService.publish(`user/${memberId}/events`, {
+          type: 'CONVERSATION_UPDATED',
+          conversationId,
+          timestamp: new Date().toISOString()
+        }).catch(err => console.error(err));
+      }
+    }
+  }
+
+  async removeMember(conversationId: string, requesterId: string, targetUserId: string): Promise<void> {
+    if (!conversationId?.trim() || !requesterId?.trim() || !targetUserId?.trim()) {
+      throw new ValidationError("conversationId, requesterId, and targetUserId are required");
+    }
+
+    const requesterRole = await this.conversationRepository.getMemberRole(conversationId, requesterId);
+    if (!requesterRole) {
+      throw new UnauthorizedError("User is not a member of this conversation");
+    }
+
+    // A user can remove themselves (leave) OR an owner/admin can remove someone
+    if (requesterId !== targetUserId) {
+      if (requesterRole !== 'owner' && requesterRole !== 'admin') {
+         throw new UnauthorizedError("Only owner or admins can remove other members");
+      }
+    }
+
+    await this.conversationRepository.removeMember(conversationId, targetUserId);
+
+    // Notify via MQTT
+    // Notify the removed user
+    if (this.mqttService) {
+      this.mqttService.publish(`user/${targetUserId}/events`, {
+        type: 'CONVERSATION_DELETED', // So it removes from their list
+        conversationId,
+        timestamp: new Date().toISOString()
+      }).catch(err => console.error(err));
+
+      // Notify remaining members
+      const remainingMembers = await this.conversationRepository.getMemberIds(conversationId);
+      for (const memberId of remainingMembers) {
+        this.mqttService.publish(`user/${memberId}/events`, {
+          type: 'CONVERSATION_UPDATED',
+          conversationId,
+          timestamp: new Date().toISOString()
+        }).catch(err => console.error(err));
+      }
+    }
+  }
 }
