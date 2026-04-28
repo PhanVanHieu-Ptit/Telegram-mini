@@ -6,12 +6,17 @@ RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
 
-COPY package*.json ./
+# 1. Copy dependency files trước
+COPY package.json package-lock.json ./
+
+# 2. Install deps (cache layer này rất quan trọng)
 RUN npm ci
 
+# 3. Copy source code
 COPY tsconfig.json ./
 COPY src ./src
 
+# 4. Build
 RUN npm run build
 
 # ── Stage 2: Production ────────────────────────────────────────────────────────
