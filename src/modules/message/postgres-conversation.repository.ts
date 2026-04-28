@@ -501,5 +501,57 @@ export class PostgresConversationRepository implements IConversationRepository {
       throw error;
     }
   }
+
+  async pinConversation(conversationId: string, userId: string): Promise<void> {
+    await pgPool.query(
+      `
+        UPDATE conversation_members
+        SET pinned = true
+        WHERE conversation_id = $1 AND user_id = $2
+      `,
+      [conversationId, userId],
+    );
+  }
+
+  async unpinConversation(conversationId: string, userId: string): Promise<void> {
+    await pgPool.query(
+      `
+        UPDATE conversation_members
+        SET pinned = false
+        WHERE conversation_id = $1 AND user_id = $2
+      `,
+      [conversationId, userId],
+    );
+  }
+
+  async addMembers(conversationId: string, userIds: string[], role: string = 'member'): Promise<void> {
+    if (userIds.length === 0) return;
+    const client = await pgPool.connect();
+    try {
+        await client.query("BEGIN");
+        const values = userIds.map((_, i) => `($1, $${i + 2}, $${userIds.length + 2})`).join(", ");
+        const params = [conversationId, ...userIds, role];
+        await client.query(`
+          INSERT INTO conversation_members (conversation_id, user_id, role)
+          VALUES ${values}
+          ON CONFLICT (conversation_id, user_id) DO NOTHING
+        `, params);
+        await this.updateConversationTimestamp(conversationId);
+        await client.query("COMMIT");
+    } catch (e) {
+        await client.query("ROLLBACK");
+        throw e;
+    } finally {
+        client.release();
+    }
+  }
+
+  async removeMember(conversationId: string, userId: string): Promise<void> {
+    await pgPool.query(`
+      DELETE FROM conversation_members
+      WHERE conversation_id = $1 AND user_id = $2
+    `, [conversationId, userId]);
+    await this.updateConversationTimestamp(conversationId);
+  }
 }
 

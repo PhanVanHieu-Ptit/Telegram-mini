@@ -264,6 +264,151 @@ const routes: FastifyPluginAsync = async (fastify) => {
       await messageController.deleteConversation(request as any, reply);
     },
   );
+
+  // Pin conversation endpoint
+  fastify.post(
+    '/conversations/:id/pin',
+    {
+      schema: {
+        summary: 'Pin a conversation',
+        tags: ['conversations'],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string' },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+            },
+          },
+          400: ErrorResponse,
+          401: ErrorResponse,
+          500: ErrorResponse,
+        },
+      },
+      preHandler: fastify.authenticate,
+    },
+    async (request, reply) => {
+      await messageController.pinConversation(request as any, reply);
+    },
+  );
+
+  // Unpin conversation endpoint
+  fastify.post(
+    '/conversations/:id/unpin',
+    {
+      schema: {
+        summary: 'Unpin a conversation',
+        tags: ['conversations'],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string' },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+            },
+          },
+          400: ErrorResponse,
+          401: ErrorResponse,
+          500: ErrorResponse,
+        },
+      },
+      preHandler: fastify.authenticate,
+    },
+    async (request, reply) => {
+      await messageController.unpinConversation(request as any, reply);
+    },
+  );
+
+  // Add members endpoint
+  fastify.post(
+    '/conversations/:id/members',
+    {
+      schema: {
+        summary: 'Add members to a conversation',
+        tags: ['conversations'],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string' },
+          },
+        },
+        body: {
+          type: 'object',
+          required: ['userIds'],
+          properties: {
+            userIds: { type: 'array', items: { type: 'string' } },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+            },
+          },
+          400: ErrorResponse,
+          401: ErrorResponse,
+          500: ErrorResponse,
+        },
+      },
+      preHandler: fastify.authenticate,
+    },
+    async (request, reply) => {
+      await messageController.addMembers(request as any, reply);
+    },
+  );
+
+  // Remove member endpoint
+  fastify.delete(
+    '/conversations/:id/members/:userId',
+    {
+      schema: {
+        summary: 'Remove a member from a conversation',
+        tags: ['conversations'],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['id', 'userId'],
+          properties: {
+            id: { type: 'string' },
+            userId: { type: 'string' },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+            },
+          },
+          400: ErrorResponse,
+          401: ErrorResponse,
+          500: ErrorResponse,
+        },
+      },
+      preHandler: fastify.authenticate,
+    },
+    async (request, reply) => {
+      await messageController.removeMember(request as any, reply);
+    },
+  );
+
   fastify.post(
     '/messages',
     {
