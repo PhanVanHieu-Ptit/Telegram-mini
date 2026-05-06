@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
+import multipart from "@fastify/multipart";
 import { messageController } from "../modules/message/message.controller";
 import { messageSummarizeController } from "../modules/message/message-summarize.controller";
 
@@ -9,6 +10,13 @@ const MessageRequestBody = {
     conversationId: { type: 'string' },
     senderId: { type: 'string' },
     content: { type: 'string' },
+    type: { type: 'string', nullable: true },
+    attachments: { 
+      type: 'array', 
+      items: { type: 'object', additionalProperties: true }, 
+      nullable: true 
+    },
+    metadata: { type: 'object', additionalProperties: true, nullable: true },
     mentions: { type: 'array', items: { type: 'string' }, nullable: true },
     replyTo: { type: 'string', nullable: true },
     forwardedFrom: { type: 'string', nullable: true },
@@ -126,6 +134,14 @@ const CreateConversationBody = {
 };
 
 const routes: FastifyPluginAsync = async (fastify) => {
+  // Register multipart plugin for file upload routes
+  await fastify.register(multipart, {
+    limits: {
+      fileSize: 100 * 1024 * 1024, // 100 MB max per file
+      files: 10,                    // Max 10 files per request
+    },
+  });
+
   // Create conversation endpoint
   fastify.post(
     '/conversations',
@@ -608,6 +624,49 @@ const routes: FastifyPluginAsync = async (fastify) => {
       await messageSummarizeController.summarize(request as any, reply);
     },
   );
+
+  fastify.post(
+    '/messages/summarize/v2',
+    {
+      schema: {
+        summary: 'Summarize chat messages using Hugging Face AI',
+        tags: ['messages'],
+        security: [{ bearerAuth: [] }],
+        body: {
+          type: 'object',
+          required: ['messages'],
+          properties: {
+            messages: { type: 'string' },
+            senderFilter: { type: 'string', nullable: true },
+            startTime: { type: 'string', nullable: true },
+            endTime: { type: 'string', nullable: true },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              summary: { type: 'array', items: { type: 'string' } },
+            },
+          },
+          400: ErrorResponse,
+          401: ErrorResponse,
+          500: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+              message: { type: 'string' },
+            },
+          },
+        },
+      },
+      preHandler: fastify.authenticate,
+    },
+    async (request, reply) => {
+      await messageSummarizeController.summarizeV2(request as any, reply);
+    },
+  );
   fastify.get(
     '/messages/search',
     {
@@ -748,6 +807,117 @@ const routes: FastifyPluginAsync = async (fastify) => {
     },
     async (request, reply) => {
       await messageController.deleteMessage(request as any, reply);
+    },
+  );
+
+  /**
+   * POST /messages/send-with-media
+   * Multipart form-data endpoint. Backend uploads files to Cloudinary,
+   * then saves the message with Cloudinary CDN URLs.
+   *
+   * Form fields:
+   *   - conversationId (required)
+   *   - content (optional text)
+   *   - type (optional, auto-detected)
+   *   - replyTo (optional messageId)
+   *   - forwardedFrom (optional)
+   *   - mentions (optional, JSON array string)
+   *   - files[] (file parts, up to 10)
+   */
+  fastify.post(
+    '/messages/send-with-media',
+    {
+      schema: {
+        summary: 'Send a message with media attachments (Cloudinary)',
+        tags: ['messages'],
+        security: [{ bearerAuth: [] }],
+        // No body schema — validated manually due to multipart
+        response: {
+          200: MessageResponse,
+          400: ErrorResponse,
+          401: ErrorResponse,
+          500: ErrorResponse,
+        },
+      },
+      preHandler: fastify.authenticate,
+    },
+    async (request, reply) => {
+      await messageController.sendMessageWithMedia(request as any, reply);
+    },
+  );
+
+  /**
+   * POST /messages/upload-attachments
+   * Upload-only endpoint: receives files via multipart/form-data,
+   * uploads each to Cloudinary, and returns the attachment metadata array.
+   * Frontend then includes these in the regular POST /messages payload.
+   */
+  fastify.post(
+    '/messages/upload-attachments',
+    {
+      schema: {
+        summary: 'Upload attachments to Cloudinary and get back CDN URLs',
+        tags: ['messages'],
+        security: [{ bearerAuth: [] }],
+        response: {
+          200: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                url: { type: 'string' },
+                public_id: { type: 'string' },
+                type: { type: 'string' },
+                format: { type: 'string' },
+                size: { type: 'number' },
+                name: { type: 'string' },
+              },
+            },
+          },
+          400: ErrorResponse,
+          401: ErrorResponse,
+          500: ErrorResponse,
+        },
+      },
+      preHandler: fastify.authenticate,
+    },
+    async (request, reply) => {
+      const authenticatedUser = (request as any).user;
+      if (!authenticatedUser?.userId) {
+        return reply.code(401).send({ error: 'Unauthorized' });
+      }
+
+      try {
+        const { uploadToCloudinary } = await import('../modules/cloudinary/cloudinary.service');
+        const parts = (request as any).parts();
+        const results: any[] = [];
+        let conversationId = 'general';
+
+        for await (const part of parts) {
+          if (part.type === 'file') {
+            const chunks: Buffer[] = [];
+            for await (const chunk of part.file) {
+              chunks.push(chunk as Buffer);
+            }
+            const buffer = Buffer.concat(chunks);
+            const result = await uploadToCloudinary(
+              buffer,
+              part.mimetype || 'application/octet-stream',
+              part.filename || 'upload',
+              buffer.length,
+              `chat-media/${conversationId}`,
+            );
+            results.push(result);
+          } else if (part.fieldname === 'conversationId') {
+            conversationId = (part as any).value || 'general';
+          }
+        }
+
+        return reply.code(200).send(results);
+      } catch (err: any) {
+        const statusCode = err.statusCode || 500;
+        return reply.code(statusCode).send({ error: (err as Error).message });
+      }
     },
   );
 };

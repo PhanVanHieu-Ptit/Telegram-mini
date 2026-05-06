@@ -148,6 +148,188 @@ export class MessageSummarizeService {
       return { success: false, message: 'Failed to summarize messages' };
     }
   }
+
+  async summarizeV2(input: SummarizeInput): Promise<SummarizeResult> {
+    const HF_MODELS = [
+      'Qwen/Qwen2.5-7B-Instruct',
+      'google/gemma-2-9b-it',
+      'mistralai/Mistral-Nemo-Instruct-2407',
+    ];
+
+    const hfToken =
+      process.env.HUGGING_FACE_TOKEN ||
+      process.env.HF_TOKEN ||
+      '';
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (hfToken) {
+      headers['Authorization'] = `Bearer ${hfToken}`;
+    }
+
+    const TIMEOUT = 15000;
+    const MAX_RETRIES = 2;
+
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    const fetchWithTimeout = async (url: string, options: any) => {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), TIMEOUT);
+
+      try {
+        const res = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+        });
+        return res;
+      } finally {
+        clearTimeout(id);
+      }
+    };
+
+    try {
+      const filteredText = filterMessages(
+        input.messages,
+        input.senderFilter,
+        input.startTime,
+        input.endTime,
+      );
+
+      if (!filteredText.trim()) {
+        return { success: true, summary: [] };
+      }
+
+      // ✅ Prompt chuẩn cho HF
+      const prompt = `${SYSTEM_PROMPT}
+
+Dưới đây là hội thoại:
+${filteredText}
+
+Yêu cầu:
+- Tóm tắt ngắn gọn
+- Dạng bullet point
+- Nêu rõ việc đã xong và việc còn tồn đọng
+`;
+
+      let lastError = '';
+
+      for (const model of HF_MODELS) {
+        // Try OpenAI-compatible endpoint first
+        const CHAT_URL = `https://api-inference.huggingface.co/models/${model}/v1/chat/completions`;
+        const LEGACY_URL = `https://api-inference.huggingface.co/models/${model}`;
+
+        console.log('[HF MODEL]', model);
+        console.log('[HF URL]', CHAT_URL);
+
+        for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+          try {
+            // Step 1: Try Chat completions
+            console.log(`[HF DEBUG] Attempting Chat API for ${model} (attempt ${attempt + 1})...`);
+            const chatPayload = {
+              model: model,
+              messages: [
+                { role: 'system', content: SYSTEM_PROMPT },
+                { role: 'user', content: prompt }
+              ],
+              max_tokens: 500,
+              temperature: 0.3,
+            };
+
+            const chatResponse = await fetchWithTimeout(CHAT_URL, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(chatPayload),
+            });
+
+            const chatRawText = await chatResponse.text();
+
+            if (chatResponse.ok && !chatRawText.startsWith('<!DOCTYPE html>')) {
+              try {
+                const data = JSON.parse(chatRawText);
+                if (data?.choices?.[0]?.message?.content) {
+                  console.log(`[HF DEBUG] Success using Chat API for ${model}`);
+                  return {
+                    success: true,
+                    summary: parseSummaryText(data.choices[0].message.content),
+                  };
+                }
+              } catch (e) {
+                console.log(`[HF DEBUG] Chat JSON parse failed for ${model}`);
+              }
+            }
+
+            // Step 2: Fallback to Legacy Text Generation API
+            console.log(`[HF DEBUG] Chat API failed for ${model}, trying Legacy API...`);
+            const legacyPayload = {
+              inputs: prompt,
+              parameters: {
+                max_new_tokens: 500,
+                temperature: 0.3,
+              },
+            };
+
+            const legacyResponse = await fetchWithTimeout(LEGACY_URL, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(legacyPayload),
+            });
+
+            const legacyRawText = await legacyResponse.text();
+            console.log(`[HF RAW ${model}]`, legacyRawText.substring(0, 200));
+
+            if (!legacyResponse.ok) {
+              if (legacyResponse.status === 503 || legacyRawText.toLowerCase().includes('loading')) {
+                console.log(`[HF DEBUG] Model ${model} is loading, retrying in 2s...`);
+                await sleep(2000);
+                continue;
+              }
+              lastError = `Model ${model} error: ${legacyRawText}`;
+              break; // Try next model
+            }
+
+            const data = JSON.parse(legacyRawText);
+            let content = '';
+            if (Array.isArray(data)) {
+              content = data[0]?.generated_text || '';
+            } else if (data?.generated_text) {
+              content = data.generated_text;
+            }
+
+            if (content && content.trim()) {
+              console.log(`[HF DEBUG] Success using Legacy API for ${model}`);
+              return {
+                success: true,
+                summary: parseSummaryText(content),
+              };
+            }
+
+            lastError = `Model ${model} returned empty content`;
+          } catch (err: any) {
+            if (err.name === 'AbortError') {
+              lastError = 'Timeout';
+            } else {
+              lastError = err?.message || 'Unknown error';
+            }
+            console.error(`[HF DEBUG] Error for ${model}:`, lastError);
+            // On network error, we might want to retry or skip
+            await sleep(1000);
+          }
+        }
+      }
+
+      return {
+        success: false,
+        message: `HF summarize failed: ${lastError}`,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: err?.message || 'Unexpected error',
+      };
+    }
+  }
 }
 
 export const messageSummarizeService = new MessageSummarizeService();
