@@ -5,6 +5,7 @@ import { MessageService } from "./message.service";
 import type { IConversationRepository } from "./message.repositories";
 import type { SendMessageInput, MessageDTO, CreateConversationInput } from "./message.types";
 import { MqttService } from "../mqtt/mqtt.service";
+import { uploadToCloudinary } from "../cloudinary/cloudinary.service";
 
 
 export interface CreateMessageBody extends SendMessageInput { }
@@ -47,9 +48,9 @@ export class MessageController {
       return;
     }
 
-    if (!conversationId || !content) {
+    if (!conversationId || (!content && (!attachments || attachments.length === 0))) {
       void reply.code(400).send({
-        error: "conversationId and content are required",
+        error: "conversationId is required, and either content or attachments must be provided",
       });
       return;
     }
@@ -553,6 +554,115 @@ export class MessageController {
     try {
       await this.service.removeMember(conversationId, requesterId, targetUserId);
       void reply.code(200).send({ success: true });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
+    }
+  }
+
+  /**
+   * POST /messages/send-with-media
+   * Accepts multipart/form-data with files + JSON fields.
+   * Uploads each file to Cloudinary, then saves the message.
+   */
+  async sendMessageWithMedia(
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const authenticatedUser = (request as any).user;
+    const currentUserId = authenticatedUser?.userId;
+
+    if (!currentUserId) {
+      void reply.code(401).send({ error: 'Unauthorized' });
+      return;
+    }
+
+    try {
+      const parts = (request as any).parts();
+
+      let conversationId = '';
+      let content = '';
+      let type = 'TEXT';
+      let replyTo: string | undefined;
+      let forwardedFrom: string | undefined;
+      let mentions: string[] = [];
+      const uploadedAttachments: any[] = [];
+
+      for await (const part of parts) {
+        if (part.type === 'file') {
+          // Collect file buffer
+          const chunks: Buffer[] = [];
+          for await (const chunk of part.file) {
+            chunks.push(chunk as Buffer);
+          }
+          const buffer = Buffer.concat(chunks);
+          const mimeType: string = part.mimetype || 'application/octet-stream';
+          const originalName: string = part.filename || 'upload';
+          const fileSize = buffer.length;
+
+          const result = await uploadToCloudinary(
+            buffer,
+            mimeType,
+            originalName,
+            fileSize,
+            `chat-media/${conversationId || 'general'}`,
+          );
+          uploadedAttachments.push(result);
+        } else {
+          // Form field
+          const value = (part as any).value as string;
+          switch (part.fieldname) {
+            case 'conversationId': conversationId = value; break;
+            case 'content': content = value; break;
+            case 'type': type = value; break;
+            case 'replyTo': replyTo = value || undefined; break;
+            case 'forwardedFrom': forwardedFrom = value || undefined; break;
+            case 'mentions':
+              try { mentions = JSON.parse(value); } catch { /* ignore */ }
+              break;
+          }
+        }
+      }
+
+      if (!conversationId) {
+        void reply.code(400).send({ error: 'conversationId is required' });
+        return;
+      }
+
+      if (!content && uploadedAttachments.length === 0) {
+        void reply.code(400).send({ error: 'Either content or files are required' });
+        return;
+      }
+
+      // Determine message type from first attachment if not explicitly set
+      if (uploadedAttachments.length > 0 && type === 'TEXT') {
+        const firstType = uploadedAttachments[0].type;
+        if (firstType === 'image') type = 'IMAGE';
+        else if (firstType === 'video') type = 'VIDEO';
+        else if (firstType === 'audio') type = 'VOICE';
+        else type = 'FILE';
+      }
+
+      console.log(`[MessageController] Saving message with ${uploadedAttachments.length} attachments`);
+      const message: MessageDTO = await this.service.sendMessage({
+        conversationId,
+        senderId: currentUserId,
+        content: content || uploadedAttachments.map(a => a.name).join(', '),
+        type,
+        attachments: uploadedAttachments,
+        replyTo,
+        forwardedFrom,
+        mentions,
+      });
+      console.log(`[MessageController] Saved message ID: ${message.id}, attachments in DO: ${JSON.stringify(message.attachments)}`);
+
+      await reply.code(200).send(message);
+
+      if ((request as any).server?.io) {
+        const io = (request as any).server.io as SocketIOServer;
+        setImmediate(() => { io.emit('message:new', message); });
+        this.emitConversationUpdated(io, message).catch(console.error);
+      }
     } catch (err: any) {
       const statusCode = err.statusCode || 500;
       void reply.code(statusCode).send({ error: (err as Error).message });

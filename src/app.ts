@@ -44,6 +44,12 @@ export async function buildApp(options: FastifyServerOptions = {}): Promise<Fast
 		ignorePattern: /swagger\.(js|ts)$/,
 	});
 
+	// Register static files
+	await app.register(require('@fastify/static'), {
+		root: path.join(process.cwd(), 'uploads'),
+		prefix: '/uploads/',
+	});
+
 	// Register routes
 	app.register(autoLoad, {
 		dir: path.join(__dirname, "routes"),

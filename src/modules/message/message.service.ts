@@ -122,6 +122,7 @@ export class MessageService {
   // Tách ra các hàm private để code sạch hơn
   private async publishMqtt(conversationId: string, message: any) {
     if (this.mqttService) {
+      console.log(`[MessageService] Publishing MQTT to ${conversationId}: hasAttachments=${!!message.attachments?.length}`);
       await this.mqttService.publish(MqttTopics.chat.message(conversationId), {
         ...message,
         timestamp: new Date().toISOString(),
@@ -167,6 +168,7 @@ export class MessageService {
 
   private validateInput(input: SendMessageInput): void {
     const trimmed = input.content?.trim();
+    const hasAttachments = Array.isArray(input.attachments) && input.attachments.length > 0;
 
     if (!input.conversationId?.trim()) {
       throw new ValidationError("conversationId is required");
@@ -176,7 +178,8 @@ export class MessageService {
       throw new ValidationError("senderId is required");
     }
 
-    if (trimmed === undefined || trimmed === "") {
+    // Allow empty content when files are attached
+    if (!hasAttachments && (trimmed === undefined || trimmed === "")) {
       throw new ValidationError("content is required");
     }
   }
