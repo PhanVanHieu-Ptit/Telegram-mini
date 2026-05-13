@@ -1,14 +1,24 @@
 
 export interface SummarizeRequest {
-  messages: string;
+  /** Raw messages string (pre-formatted). Required if conversationId not provided. */
+  messages?: string;
+  /** Fetch messages from DB by conversationId. Required if messages not provided. */
+  conversationId?: string;
   senderFilter?: string;
   startTime?: string;
   endTime?: string;
 }
 
-export interface SummarizeResponse {
+/** Structured result from a single chunk or final merge */
+export interface SummaryResult {
+  summary: string;
+  resolved: string[];
+  pending: string[];
+  language: 'vi';
+}
+
+export interface SummarizeResponse extends SummaryResult {
   success: boolean;
-  summary: string[];
   message?: string;
 }
 

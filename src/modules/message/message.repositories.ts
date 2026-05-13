@@ -84,6 +84,10 @@ export interface IConversationRepository {
   
   unpinConversation(conversationId: string, userId: string): Promise<void>;
 
+  muteConversation(conversationId: string, userId: string): Promise<void>;
+  
+  unmuteConversation(conversationId: string, userId: string): Promise<void>;
+
   addMembers(conversationId: string, userIds: string[], role?: string): Promise<void>;
   
   removeMember(conversationId: string, userId: string): Promise<void>;
