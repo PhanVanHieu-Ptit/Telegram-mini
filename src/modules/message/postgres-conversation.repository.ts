@@ -524,6 +524,28 @@ export class PostgresConversationRepository implements IConversationRepository {
     );
   }
 
+  async muteConversation(conversationId: string, userId: string): Promise<void> {
+    await pgPool.query(
+      `
+        UPDATE conversation_members
+        SET muted = true
+        WHERE conversation_id = $1 AND user_id = $2
+      `,
+      [conversationId, userId],
+    );
+  }
+
+  async unmuteConversation(conversationId: string, userId: string): Promise<void> {
+    await pgPool.query(
+      `
+        UPDATE conversation_members
+        SET muted = false
+        WHERE conversation_id = $1 AND user_id = $2
+      `,
+      [conversationId, userId],
+    );
+  }
+
   async addMembers(conversationId: string, userIds: string[], role: string = 'member'): Promise<void> {
     if (userIds.length === 0) return;
     const client = await pgPool.connect();

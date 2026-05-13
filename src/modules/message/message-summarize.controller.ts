@@ -28,38 +28,13 @@ export class MessageSummarizeController {
     });
 
     if (!result.success) {
-      void reply.code(500).send({ success: false, message: result.message ?? 'Failed to summarize messages' });
+      void reply.code(500).send(result);
       return;
     }
-
-    void reply.code(200).send({ success: true, summary: result.summary });
+ 
+    void reply.code(200).send(result);
   }
 
-  async summarizeV2(
-    request: FastifyRequest<{ Body: SummarizeBody }>,
-    reply: FastifyReply,
-  ): Promise<void> {
-    const { messages, senderFilter, startTime, endTime } = request.body ?? {};
-
-    if (!messages || typeof messages !== 'string' || !messages.trim()) {
-      void reply.code(400).send({ error: 'messages field is required and must be a non-empty string' });
-      return;
-    }
-
-    const result = await messageSummarizeService.summarizeV2({
-      messages,
-      senderFilter,
-      startTime,
-      endTime,
-    });
-
-    if (!result.success) {
-      void reply.code(500).send({ success: false, message: result.message ?? 'Failed to summarize messages via Hugging Face' });
-      return;
-    }
-
-    void reply.code(200).send({ success: true, summary: result.summary });
-  }
 }
 
 export const messageSummarizeController = new MessageSummarizeController();

@@ -515,6 +515,50 @@ export class MessageController {
     }
   }
 
+  async muteConversation(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const { id: conversationId } = request.params;
+    const authenticatedUser = (request as any).user;
+    const userId = authenticatedUser?.userId;
+
+    if (!userId) {
+      void reply.code(401).send({ error: "Unauthorized" });
+      return;
+    }
+
+    try {
+      await this.service.muteConversation(conversationId, userId);
+      void reply.code(200).send({ success: true });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
+    }
+  }
+
+  async unmuteConversation(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply,
+  ): Promise<void> {
+    const { id: conversationId } = request.params;
+    const authenticatedUser = (request as any).user;
+    const userId = authenticatedUser?.userId;
+
+    if (!userId) {
+      void reply.code(401).send({ error: "Unauthorized" });
+      return;
+    }
+
+    try {
+      await this.service.unmuteConversation(conversationId, userId);
+      void reply.code(200).send({ success: true });
+    } catch (err: any) {
+      const statusCode = err.statusCode || 500;
+      void reply.code(statusCode).send({ error: (err as Error).message });
+    }
+  }
+
   async addMembers(
     request: FastifyRequest<{ Params: { id: string }; Body: { userIds: string[] } }>,
     reply: FastifyReply,

@@ -349,6 +349,74 @@ const routes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
+  // Mute conversation endpoint
+  fastify.post(
+    '/conversations/:id/mute',
+    {
+      schema: {
+        summary: 'Mute a conversation',
+        tags: ['conversations'],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string' },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+            },
+          },
+          400: ErrorResponse,
+          401: ErrorResponse,
+          500: ErrorResponse,
+        },
+      },
+      preHandler: fastify.authenticate,
+    },
+    async (request, reply) => {
+      await messageController.muteConversation(request as any, reply);
+    },
+  );
+
+  // Unmute conversation endpoint
+  fastify.post(
+    '/conversations/:id/unmute',
+    {
+      schema: {
+        summary: 'Unmute a conversation',
+        tags: ['conversations'],
+        security: [{ bearerAuth: [] }],
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string' },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              success: { type: 'boolean' },
+            },
+          },
+          400: ErrorResponse,
+          401: ErrorResponse,
+          500: ErrorResponse,
+        },
+      },
+      preHandler: fastify.authenticate,
+    },
+    async (request, reply) => {
+      await messageController.unmuteConversation(request as any, reply);
+    },
+  );
+
   // Add members endpoint
   fastify.post(
     '/conversations/:id/members',
@@ -591,7 +659,7 @@ const routes: FastifyPluginAsync = async (fastify) => {
         security: [{ bearerAuth: [] }],
         body: {
           type: 'object',
-          required: ['messages'],
+          required: [],
           properties: {
             messages: { type: 'string' },
             senderFilter: { type: 'string', nullable: true },
@@ -604,7 +672,10 @@ const routes: FastifyPluginAsync = async (fastify) => {
             type: 'object',
             properties: {
               success: { type: 'boolean' },
-              summary: { type: 'array', items: { type: 'string' } },
+              summary: { type: 'string' },
+              resolved: { type: 'array', items: { type: 'string' } },
+              pending: { type: 'array', items: { type: 'string' } },
+              language: { type: 'string' },
             },
           },
           400: ErrorResponse,
@@ -613,6 +684,10 @@ const routes: FastifyPluginAsync = async (fastify) => {
             type: 'object',
             properties: {
               success: { type: 'boolean' },
+              summary: { type: 'string' },
+              resolved: { type: 'array', items: { type: 'string' } },
+              pending: { type: 'array', items: { type: 'string' } },
+              language: { type: 'string' },
               message: { type: 'string' },
             },
           },
@@ -625,48 +700,48 @@ const routes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  fastify.post(
-    '/messages/summarize/v2',
-    {
-      schema: {
-        summary: 'Summarize chat messages using Hugging Face AI',
-        tags: ['messages'],
-        security: [{ bearerAuth: [] }],
-        body: {
-          type: 'object',
-          required: ['messages'],
-          properties: {
-            messages: { type: 'string' },
-            senderFilter: { type: 'string', nullable: true },
-            startTime: { type: 'string', nullable: true },
-            endTime: { type: 'string', nullable: true },
-          },
-        },
-        response: {
-          200: {
-            type: 'object',
-            properties: {
-              success: { type: 'boolean' },
-              summary: { type: 'array', items: { type: 'string' } },
-            },
-          },
-          400: ErrorResponse,
-          401: ErrorResponse,
-          500: {
-            type: 'object',
-            properties: {
-              success: { type: 'boolean' },
-              message: { type: 'string' },
-            },
-          },
-        },
-      },
-      preHandler: fastify.authenticate,
-    },
-    async (request, reply) => {
-      await messageSummarizeController.summarizeV2(request as any, reply);
-    },
-  );
+  // fastify.post(
+  //   '/messages/summarize/v2',
+  //   {
+  //     schema: {
+  //       summary: 'Summarize chat messages using Hugging Face AI',
+  //       tags: ['messages'],
+  //       security: [{ bearerAuth: [] }],
+  //       body: {
+  //         type: 'object',
+  //         required: ['messages'],
+  //         properties: {
+  //           messages: { type: 'string' },
+  //           senderFilter: { type: 'string', nullable: true },
+  //           startTime: { type: 'string', nullable: true },
+  //           endTime: { type: 'string', nullable: true },
+  //         },
+  //       },
+  //       response: {
+  //         200: {
+  //           type: 'object',
+  //           properties: {
+  //             success: { type: 'boolean' },
+  //             summary: { type: 'array', items: { type: 'string' } },
+  //           },
+  //         },
+  //         400: ErrorResponse,
+  //         401: ErrorResponse,
+  //         500: {
+  //           type: 'object',
+  //           properties: {
+  //             success: { type: 'boolean' },
+  //             message: { type: 'string' },
+  //           },
+  //         },
+  //       },
+  //     },
+  //     preHandler: fastify.authenticate,
+  //   },
+  //   async (request, reply) => {
+  //     await messageSummarizeController.summarizeV2(request as any, reply);
+  //   },
+  // );
   fastify.get(
     '/messages/search',
     {

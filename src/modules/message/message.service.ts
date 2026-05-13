@@ -457,6 +457,34 @@ export class MessageService {
     await this.conversationRepository.unpinConversation(conversationId, userId);
   }
 
+  async muteConversation(conversationId: string, userId: string): Promise<void> {
+    if (!conversationId?.trim()) {
+      throw new ValidationError("conversationId is required");
+    }
+    if (!userId?.trim()) {
+      throw new ValidationError("userId is required");
+    }
+    const isMember = await this.conversationRepository.isMember(conversationId, userId);
+    if (!isMember) {
+      throw new UnauthorizedError("User is not a member of this conversation");
+    }
+    await this.conversationRepository.muteConversation(conversationId, userId);
+  }
+
+  async unmuteConversation(conversationId: string, userId: string): Promise<void> {
+    if (!conversationId?.trim()) {
+      throw new ValidationError("conversationId is required");
+    }
+    if (!userId?.trim()) {
+      throw new ValidationError("userId is required");
+    }
+    const isMember = await this.conversationRepository.isMember(conversationId, userId);
+    if (!isMember) {
+      throw new UnauthorizedError("User is not a member of this conversation");
+    }
+    await this.conversationRepository.unmuteConversation(conversationId, userId);
+  }
+
   async addMembers(conversationId: string, requesterId: string, userIds: string[]): Promise<void> {
     if (!conversationId?.trim() || !requesterId?.trim() || !userIds || userIds.length === 0) {
       throw new ValidationError("conversationId, requesterId, and userIds are required");
