@@ -65,6 +65,13 @@ export class CallService {
     return this.mapToDTO(updatedCall!);
   }
 
+  // ── Miss a call (no answer / timeout) ────────────────────────────────────
+  async missCall(callId: string): Promise<CallDTO> {
+    const updated = await this.callRepository.updateCallStatus(callId, 'missed');
+    if (!updated) throw new Error(`Call with ID ${callId} not found`);
+    return this.mapToDTO(updated);
+  }
+
   // ── Queries ────────────────────────────────────────────────────────────────
   async getCallById(id: string): Promise<CallDTO | null> {
     const call = await this.callRepository.getCallById(id);

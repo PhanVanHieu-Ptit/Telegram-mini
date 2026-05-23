@@ -79,6 +79,13 @@ export class MongoCallRepository {
     return this.mapToEntity(call);
   }
 
+  /** Update call status to any valid value (used by internal endpoints). */
+  async updateCallStatus(callId: string, status: CallEntity['status']): Promise<CallEntity | null> {
+    const call = await CallModel.findByIdAndUpdate(callId, { status }, { new: true });
+    if (!call) return null;
+    return this.mapToEntity(call);
+  }
+
   async getCallHistory(userId: string): Promise<CallEntity[]> {
     const calls = await CallModel.find({
       $or: [{ callerId: userId }, { receiverId: userId }],
