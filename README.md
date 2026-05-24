@@ -1,3 +1,12 @@
+---
+title: 3HChat
+emoji: 🚀
+colorFrom: blue
+colorTo: green
+sdk: docker
+pinned: false
+---
+
 # 3HChat — Backend API
 
 A production-ready REST + WebSocket API powering a Telegram-like real-time messaging and calling platform. Built with Fastify for high-throughput performance, it handles authentication, chat, WebRTC call lifecycle, MQTT-based presence, media uploads, and push notifications — all in a single, well-structured TypeScript service.
