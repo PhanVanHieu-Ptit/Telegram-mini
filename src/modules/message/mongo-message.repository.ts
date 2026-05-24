@@ -240,6 +240,15 @@ export class MongoMessageRepository implements IMessageRepository {
       $addToSet: { deletedForUsers: userId }
     }).exec();
   }
+
+  async getLastMessageId(conversationId: string): Promise<string | null> {
+    const doc = await this.messageModel
+      .findOne({ conversationId })
+      .sort({ createdAt: -1 })
+      .select('_id')
+      .exec();
+    return doc ? doc._id.toString() : null;
+  }
 }
 
 export const mongoMessageRepository = new MongoMessageRepository(MessageModel);

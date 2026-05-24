@@ -36,8 +36,10 @@ export interface IMessageRepository {
   update(messageId: string, data: Partial<MessageEntity>): Promise<MessageDTO | null>;
 
   deleteForEveryone(messageId: string, userId: string): Promise<MessageDTO | null>;
-  
+
   deleteForMe(messageId: string, userId: string): Promise<void>;
+
+  getLastMessageId(conversationId: string): Promise<string | null>;
 }
 
 export interface IConversationRepository {
