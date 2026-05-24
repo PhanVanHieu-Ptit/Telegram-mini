@@ -72,7 +72,7 @@ export class MessageController {
       if (request.server.io) {
         const io = request.server.io;
         setImmediate(() => {
-          io.emit("message:new", message);
+          io.to(`conversation:${message.conversationId}`).emit("message:new", message);
         });
         this.emitConversationUpdated(io, message).catch(console.error);
       }
@@ -416,7 +416,7 @@ export class MessageController {
       void reply.code(200).send(message);
 
       if (request.server.io) {
-        request.server.io.emit("message:updated", message);
+        request.server.io.to(`conversation:${message.conversationId}`).emit("message:updated", message);
       }
     } catch (err: any) {
       const statusCode = err.statusCode || 500;
@@ -441,7 +441,7 @@ export class MessageController {
       void reply.code(200).send({ success: true });
 
       if (mode === 'everyone' && request.server.io) {
-        request.server.io.emit("message:deleted", { messageId, conversationId });
+        request.server.io.to(`conversation:${conversationId}`).emit("message:deleted", { messageId, conversationId });
       }
     } catch (err: any) {
       const statusCode = err.statusCode || 500;
@@ -704,7 +704,7 @@ export class MessageController {
 
       if ((request as any).server?.io) {
         const io = (request as any).server.io as SocketIOServer;
-        setImmediate(() => { io.emit('message:new', message); });
+        setImmediate(() => { io.to(`conversation:${message.conversationId}`).emit('message:new', message); });
         this.emitConversationUpdated(io, message).catch(console.error);
       }
     } catch (err: any) {

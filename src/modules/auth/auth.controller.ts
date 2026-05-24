@@ -5,7 +5,11 @@ import type { AuthService } from './auth.service';
 import { authService } from './auth.service';
 import { LoginParams, RegisterParams } from './auth.types';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET: string = (() => {
+  const s = process.env.JWT_SECRET;
+  if (!s) throw new Error('JWT_SECRET environment variable is required');
+  return s;
+})();
 
 export interface RegisterBody extends RegisterParams { }
 export interface LoginBody extends LoginParams { }

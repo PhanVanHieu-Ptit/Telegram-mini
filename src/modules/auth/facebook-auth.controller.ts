@@ -4,7 +4,11 @@ import { facebookAuthService } from './facebook-auth.service';
 import { postgresUserRepository } from './postgres-user.repository';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET: string = (() => {
+  const s = process.env.JWT_SECRET;
+  if (!s) throw new Error('JWT_SECRET environment variable is required');
+  return s;
+})();
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 export class FacebookAuthController {
@@ -83,7 +87,7 @@ export class FacebookAuthController {
 
       // 6. Redirect to frontend callback page with token so JS can save it
       return reply.redirect(
-        `${FRONTEND_URL}/auth/google/callback?token=${encodeURIComponent(token)}`,
+        `${FRONTEND_URL}/auth/facebook/callback?token=${encodeURIComponent(token)}`,
       );
     } catch (error: any) {
       request.log.error(error);
