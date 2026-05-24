@@ -16,6 +16,7 @@ export class PresenceService {
     private readonly presenceMap = new Map<string, PresenceState>();
     private heartbeatCheckerInterval: NodeJS.Timeout | null = null;
     private mqttService: any = null;
+    private heartbeatHandler: ((topic: string, message: Buffer) => void) | null = null;
 
     /**
      * Private constructor to prevent direct instantiation
@@ -119,10 +120,14 @@ export class PresenceService {
         // Subscribe to heartbeat topic (presence/+/heartbeat)
         await this.mqttService.subscribe("presence/+/heartbeat");
 
-        // Set up message listener for heartbeats
-        this.mqttService.client.on("message", (topic: string, message: Buffer) => {
+        // Remove previous listener before adding a new one to prevent duplicates on reconnect
+        if (this.heartbeatHandler) {
+            this.mqttService.client.off("message", this.heartbeatHandler);
+        }
+        this.heartbeatHandler = (topic: string, message: Buffer) => {
             this.handleHeartbeat(topic, message);
-        });
+        };
+        this.mqttService.client.on("message", this.heartbeatHandler);
 
         // Start interval checker every 30 seconds
         // If user's lastSeen > 30 seconds ago, mark them offline
@@ -183,6 +188,10 @@ export class PresenceService {
         if (this.heartbeatCheckerInterval) {
             clearInterval(this.heartbeatCheckerInterval);
             this.heartbeatCheckerInterval = null;
+        }
+        if (this.heartbeatHandler && this.mqttService) {
+            this.mqttService.client.off("message", this.heartbeatHandler);
+            this.heartbeatHandler = null;
         }
         this.mqttService = null;
     }

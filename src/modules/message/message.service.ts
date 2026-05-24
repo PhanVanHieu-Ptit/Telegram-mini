@@ -76,13 +76,13 @@ export class MessageService {
     const editHistory = message.editHistory || [];
     editHistory.push({
       content: message.content,
-      editedAt: message.editedAt || message.createdAt
+      editedAt: new Date(message.editedAt ?? message.createdAt),
     });
 
     const updatedMessage = await this.messageRepository.update(messageId, {
       content,
       editedAt: new Date(),
-      editHistory: editHistory as any
+      editHistory: editHistory as any,
     });
 
     if (!updatedMessage) throw new ValidationError("Failed to update message");
@@ -135,6 +135,8 @@ export class MessageService {
       this.userService.getUserById(input.senderId),
       this.conversationRepository.getMemberIds(input.conversationId),
     ]);
+
+    if (!Array.isArray(memberIds)) return;
 
     const recipientIds = memberIds.filter((id) => {
       const senderIdStr = String(input.senderId).trim().toLowerCase();
@@ -269,18 +271,17 @@ export class MessageService {
     // Reset unread (SQL)
     await this.conversationRepository.resetUnread(conversationId, userId);
 
-    // Get the last message to include messageId in seen event
-    const messages = await this.messageRepository.findByConversationId(conversationId, userId);
-    const lastMessage = messages && messages.length > 0 ? messages[messages.length - 1] : null;
+    // Get last message id without fetching all messages
+    const lastMessageId = await this.messageRepository.getLastMessageId(conversationId);
 
     // Publish seen event
-    if (lastMessage && lastMessage.id) {
+    if (lastMessageId) {
       await this.mqttService.publish(
         MqttTopics.chat.seen(conversationId),
         {
           userId,
           conversationId,
-          messageId: lastMessage.id,
+          messageId: lastMessageId,
           timestamp: new Date().toISOString(),
         },
       );
@@ -324,20 +325,22 @@ export class MessageService {
     // Let's assume delete for both if they have permission.
     const memberIds = await this.conversationRepository.getMemberIds(conversationId);
 
-    // 2. Delete from Postgres (cascades to members)
-    await this.conversationRepository.deleteConversation(conversationId);
-
-    // 3. Delete from Mongo (messages)
+    // 2. Delete from Mongo (messages) first — if this fails, Postgres is still intact and operation is retryable
     await this.messageRepository.deleteByConversationId(conversationId);
 
-    // 4. Notify members
+    // 3. Delete from Postgres (cascades to members)
+    await this.conversationRepository.deleteConversation(conversationId);
+
+    // 4. Notify members in parallel
     if (this.mqttService) {
-      for (const memberId of memberIds) {
-        await this.mqttService.publish(`user/${memberId}/events`, {
-          type: 'CONVERSATION_DELETED',
-          conversationId,
-        }).catch(err => console.error("Failed to publish mqtt event", err));
-      }
+      await Promise.allSettled(
+        memberIds.map((memberId) =>
+          this.mqttService.publish(`user/${memberId}/events`, {
+            type: 'CONVERSATION_DELETED',
+            conversationId,
+          }).catch((err: unknown) => console.error("Failed to publish mqtt event", err))
+        )
+      );
     }
   }
 
@@ -507,16 +510,18 @@ export class MessageService {
 
     await this.conversationRepository.addMembers(conversationId, userIds);
 
-    // Notify via MQTT
+    // Notify via MQTT in parallel
     const allMembers = await this.conversationRepository.getMemberIds(conversationId);
-    if (this.mqttService) {
-      for (const memberId of allMembers) {
-        this.mqttService.publish(`user/${memberId}/events`, {
-          type: 'CONVERSATION_UPDATED',
-          conversationId,
-          timestamp: new Date().toISOString()
-        }).catch(err => console.error(err));
-      }
+    if (this.mqttService && Array.isArray(allMembers)) {
+      await Promise.allSettled(
+        allMembers.map((memberId) =>
+          this.mqttService.publish(`user/${memberId}/events`, {
+            type: 'CONVERSATION_UPDATED',
+            conversationId,
+            timestamp: new Date().toISOString(),
+          }).catch((err: unknown) => console.error(err))
+        )
+      );
     }
   }
 
@@ -533,30 +538,40 @@ export class MessageService {
     // A user can remove themselves (leave) OR an owner/admin can remove someone
     if (requesterId !== targetUserId) {
       if (requesterRole !== 'owner' && requesterRole !== 'admin') {
-         throw new UnauthorizedError("Only owner or admins can remove other members");
+        throw new UnauthorizedError("Only owner or admins can remove other members");
+      }
+
+      // Check target's role — admin cannot remove another admin or owner; only owner can
+      const targetRole = await this.conversationRepository.getMemberRole(conversationId, targetUserId);
+      if (targetRole === 'owner') {
+        throw new UnauthorizedError("Cannot remove the owner of the conversation");
+      }
+      if (targetRole === 'admin' && requesterRole !== 'owner') {
+        throw new UnauthorizedError("Only the owner can remove an admin");
       }
     }
 
     await this.conversationRepository.removeMember(conversationId, targetUserId);
 
-    // Notify via MQTT
-    // Notify the removed user
+    // Notify via MQTT in parallel
     if (this.mqttService) {
-      this.mqttService.publish(`user/${targetUserId}/events`, {
-        type: 'CONVERSATION_DELETED', // So it removes from their list
-        conversationId,
-        timestamp: new Date().toISOString()
-      }).catch(err => console.error(err));
-
-      // Notify remaining members
       const remainingMembers = await this.conversationRepository.getMemberIds(conversationId);
-      for (const memberId of remainingMembers) {
-        this.mqttService.publish(`user/${memberId}/events`, {
-          type: 'CONVERSATION_UPDATED',
+      await Promise.allSettled([
+        this.mqttService.publish(`user/${targetUserId}/events`, {
+          type: 'CONVERSATION_DELETED',
           conversationId,
-          timestamp: new Date().toISOString()
-        }).catch(err => console.error(err));
-      }
+          timestamp: new Date().toISOString(),
+        }).catch((err: unknown) => console.error(err)),
+        ...(Array.isArray(remainingMembers)
+          ? remainingMembers.map((memberId) =>
+              this.mqttService.publish(`user/${memberId}/events`, {
+                type: 'CONVERSATION_UPDATED',
+                conversationId,
+                timestamp: new Date().toISOString(),
+              }).catch((err: unknown) => console.error(err))
+            )
+          : []),
+      ]);
     }
   }
 }
