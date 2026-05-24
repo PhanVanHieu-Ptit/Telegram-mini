@@ -136,9 +136,11 @@ const routes: FastifyPluginAsync = async (fastify) => {
 
   // GET /calls/get-ice-servers ─── Fetch TURN/STUN credentials from Metered
   fastify.get('/calls/get-ice-servers', {
+    preHandler: (fastify as any).authenticate,
     schema: {
       summary: 'Get ICE server credentials (TURN/STUN)',
       tags: ['calls'],
+      security: [{ bearerAuth: [] }],
       response: {
         200: {
           type: 'array',

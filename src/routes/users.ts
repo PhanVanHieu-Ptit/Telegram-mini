@@ -20,9 +20,11 @@ const usersRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     "/users",
     {
+      preHandler: [(fastify as any).authenticate],
       schema: {
         description: "Get all users",
         tags: ["users"],
+        security: [{ bearerAuth: [] }],
         response: {
           200: UserResponseSchema,
         },

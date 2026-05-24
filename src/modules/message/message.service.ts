@@ -76,7 +76,7 @@ export class MessageService {
     const editHistory = message.editHistory || [];
     editHistory.push({
       content: message.content,
-      editedAt: new Date(message.editedAt ?? message.createdAt),
+      editedAt: (message.editedAt ?? message.createdAt).toString(),
     });
 
     const updatedMessage = await this.messageRepository.update(messageId, {

@@ -28,7 +28,7 @@ export class AuthService {
   generateJWT(user: User): string {
     return jwt.sign(
       { userId: user.id, email: user.email },
-      JWT_SECRET,
+      JWT_SECRET as string,
       { expiresIn: '7d' }
     );
   }

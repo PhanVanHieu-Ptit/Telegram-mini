@@ -27,9 +27,11 @@ const routes: FastifyPluginAsync = async (fastify) => {
     fastify.get<{ Params: PresenceParams }>(
         '/presence/:userId',
         {
+            preHandler: [(fastify as any).authenticate],
             schema: {
                 description: 'Get user presence status',
                 tags: ['presence'],
+                security: [{ bearerAuth: [] }],
                 params: {
                     type: 'object',
                     required: ['userId'],

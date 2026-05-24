@@ -10,8 +10,10 @@ declare module "fastify" {
 }
 
 const authPlugin: FastifyPluginAsync = async (fastify) => {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) throw new Error('JWT_SECRET environment variable is required');
+
     fastify.decorate("authenticate", async (request: FastifyRequest, reply: FastifyReply) => {
-        const secret = process.env.JWT_SECRET || "your-secret-key";
         let token: string | undefined;
 
         // 1. Try to get token from Authorization header
