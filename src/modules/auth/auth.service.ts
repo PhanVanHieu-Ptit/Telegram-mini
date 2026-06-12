@@ -4,7 +4,7 @@ import type { User, RegisterParams, LoginParams, AuthResponse } from './auth.typ
 import type { IUserRepository } from './auth.repositories';
 import { postgresUserRepository } from './postgres-user.repository';
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET as string;
 if (!JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required');
 }
